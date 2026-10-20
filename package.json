@@ -1,0 +1,14 @@
+{
+  "name": "master",
+  "version": "0.3.11",
+  "description": "map(SeqShelf)・document(docment)・スケジュールを1つに束ねるシェルアプリ",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

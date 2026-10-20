@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>品質</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", "Yu Gothic UI", sans-serif; background: #fff; color: #223; padding: 14px 18px; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .note { font-size: 11px; color: #778; margin-bottom: 12px; }
+  .pj { border: 1px solid #dde3ec; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+  .pjHead { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; }
+  .pjHead:hover { background: #f6f9ff; }
+  .badge { font-size: 11px; border-radius: 9px; padding: 1px 8px; color: #fff; font-weight: 600; }
+  .ok .badge { background: #3aa675; }
+  .ng .badge { background: #c0392b; }
+  .unexamined .badge { background: #99a; }
+  .broken .badge { background: #b26a00; }
+  .pjName { font-weight: 600; font-size: 14px; }
+  .stats { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: #556; }
+  .stats b { color: #223; }
+  .stats .bad { color: #c0392b; font-weight: 700; }
+  .detail { display: none; border-top: 1px solid #eef1f6; padding: 8px 14px 12px; background: #fafbfd; }
+  .pj.openDetail .detail { display: block; }
+  table.cats { border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+  table.cats th, table.cats td { border: 1px solid #e4e9f1; padding: 3px 10px; text-align: center; }
+  table.cats th { background: #f2f5fa; font-weight: 600; color: #445; }
+  td.zero { color: #bbc; }
+  td.openCell { background: #fdecea; color: #c0392b; font-weight: 700; }
+  ul.issues { margin: 6px 0; padding-left: 18px; font-size: 12px; color: #a33; }
+  .sec { font-size: 12px; font-weight: 600; color: #445; margin-top: 8px; }
+  .muted { color: #99a; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>🛡 品質 — 非機能要件のクリア状況</h1>
+<div class="note">
+  本棚（正本）の集計。<b>緑 = 検討した上でクリア</b>（未検討の懸念 0・失敗試験 0・文書ズレなし）／
+  <b>赤 = 残りあり</b>／<b>灰 = 懸念・試験が書かれていない</b>（安全の意味ではない）。
+  書いていない懸念はここに出ない — 洗い出しは Map の R ビューで。
+</div>
+<div id="list">読み込み中...</div>
+
+<script>
+(() => {
+  const CAT_LABELS = {
+    availability: "可用性", reliability: "信頼性", performance: "性能",
+    security: "セキュリティ", operability: "運用性",
+  };
+  const STATUS = {
+    ok: "クリア", ng: "残りあり", unexamined: "検討なし", broken: "本棚が読めない",
+  };
+
+  function render(projects) {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+    for (const p of projects) {
+      const div = document.createElement("div");
+      div.className = `pj ${p.status}`;
+      const head = document.createElement("div");
+      head.className = "pjHead";
+      const openN = p.concerns ? p.concerns.open.length : 0;
+      const failN = p.tests ? p.tests.fail.length : 0;
+      head.innerHTML = `
+        <span class="badge">${STATUS[p.status] || p.status}</span>
+        <span class="pjName">${p.name}</span>
+        <span class="stats">${p.concerns ? `
+          <span>懸念 <b class="${openN ? "bad" : ""}">未検討 ${openN}</b> / 払拭 ${p.concerns.covered} / 棄却 ${p.concerns.dismissed}</span>
+          <span>試験 <b>${p.tests.pass} pass</b>${failN ? ` / <b class="bad">${failN} fail</b>` : ""}${p.tests.none ? ` / 未実施 ${p.tests.none}` : ""}</span>
+          <span>期日超過 <b class="${p.overdue.length ? "bad" : ""}">${p.overdue.length}</b></span>
+          <span>文書 <b class="${p.docs === "ng" ? "bad" : ""}">${p.docs}</b></span>` : ""}
+        </span>`;
+      head.addEventListener("click", () => div.classList.toggle("openDetail"));
+      div.appendChild(head);
+
+      if (p.concerns) {
+        const det = document.createElement("div");
+        det.className = "detail";
+        let html = `<div class="sec">懸念（カテゴリ × 状態）</div><table class="cats"><tr><th></th>${Object.values(CAT_LABELS).map((l) => `<th>${l}</th>`).join("")}</tr>`;
+        for (const [state, label] of [["open", "未検討"], ["covered", "払拭"], ["dismissed", "棄却"]]) {
+          html += `<tr><th>${label}</th>` + Object.keys(CAT_LABELS).map((c) => {
+            const n = (p.concerns.byCat[c] || {})[state] || 0;
+            const cls = n === 0 ? "zero" : state === "open" ? "openCell" : "";
+            return `<td class="${cls}">${n}</td>`;
+          }).join("") + "</tr>";
+        }
+        html += "</table>";
+        if (p.concerns.open.length) {
+          html += `<div class="sec">未検討の懸念（クリアの妨げ）</div><ul class="issues">` +
+            p.concerns.open.map((c) => `<li>[${CAT_LABELS[c.category] || c.category}] ${c.title}</li>`).join("") + "</ul>";
+        }
+        if (p.tests.fail.length) {
+          html += `<div class="sec">失敗した試験</div><ul class="issues">` +
+            p.tests.fail.map((t) => `<li>${t}</li>`).join("") + "</ul>";
+        }
+        if (p.overdue.length) {
+          html += `<div class="sec">期日超過の未完了チケット</div><ul class="issues">` +
+            p.overdue.map((t) => `<li>#${t.key} ${t.title}（期日 ${t.due}）</li>`).join("") + "</ul>";
+        }
+        if (p.docs === "ng") {
+          html += `<div class="muted">文書と本棚がズレています → GET /api/doc-map-check?pj=${p.pj}</div>`;
+        }
+        det.innerHTML = html;
+        div.appendChild(det);
+      }
+      list.appendChild(div);
+    }
+  }
+
+  fetch("/api/nfr").then((r) => r.json()).then((d) => {
+    // 赤 → 灰 → 緑の順で残りが上に来るようにする
+    const order = { broken: 0, ng: 1, unexamined: 2, ok: 3 };
+    d.projects.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.name.localeCompare(b.name, "ja"));
+    render(d.projects);
+  }).catch(() => {
+    document.getElementById("list").textContent = "読み込みに失敗しました";
+  });
+})();
+</script>
+</body>
+</html>

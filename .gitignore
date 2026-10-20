@@ -1,0 +1,8 @@
+node_modules/
+# 旧データ置き場 (現在は %APPDATA%\Master\data。残っているのは移行時のバックアップ)
+data/
+# 生成物
+master.ico
+*.log
+# 配布版の出力 (MS-20)
+release/

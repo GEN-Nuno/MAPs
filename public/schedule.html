@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: "Segoe UI", "Yu Gothic UI", sans-serif; background: #fff; color: #223; display: flex; flex-direction: column; }
+
+  #bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #dde3ec; }
+  #bar button { border: 1px solid #c8d2e0; background: #f6f8fb; border-radius: 6px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+  #bar button:hover { background: #e9eef6; }
+  #monthLabel { font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; }
+
+  /* ビュー切替 (カレンダー / ガント) */
+  .seg { display: flex; border: 1px solid #c8d2e0; border-radius: 6px; overflow: hidden; margin-left: 8px; }
+  /* #bar button より詳細度を上げないと背景が負ける */
+  #bar .seg button { border: none; border-radius: 0; }
+  #bar .seg button.on { background: #5b8def; color: #fff; }
+  #bar #addTask { margin-left: auto; background: #5b8def; color: #fff; border-color: #5b8def; }
+  #pjFilter { border: 1px solid #c8d2e0; border-radius: 6px; padding: 4px 6px; font-size: 13px; background: #f6f8fb; max-width: 200px; }
+  #hideDoneWrap { font-size: 12px; color: #556; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+  /* ガント: 1 行 = ラベル列 + 28 日分の列。バーは grid-column で配置 */
+  #gantt { flex: 1; overflow: auto; display: none; }
+  #gantt.show { display: block; }
+  #main.hide { display: none; }
+  .gRow { display: grid; grid-template-columns: 210px repeat(28, minmax(22px, 1fr)); align-items: center; border-bottom: 1px solid #f0f3f8; }
+  .gHead { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #dde3ec; z-index: 2; }
+  .gDay { font-size: 10px; text-align: center; color: #667; padding: 3px 0; border-left: 1px solid #f0f3f8; }
+  .gBg { height: 100%; border-left: 1px solid #f4f6fa; grid-row: 1; }
+  .gDay.we, .gBg.we { background: #f6f8fb; }
+  .gDay.today { background: #e8f0fe; color: #2b5cc8; font-weight: 700; }
+  .gBg.today { background: #eef4fd; }
+  .gSec { background: #f2f5fa; font-weight: 600; font-size: 12px; padding: 5px 10px; border-top: 1px solid #dde3ec; color: #445; }
+  .gLabel { grid-row: 1; font-size: 12px; padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; z-index: 1; }
+  .gLabel:hover { color: #2b5cc8; }
+  .gBar { grid-row: 1; height: 16px; border-radius: 8px; margin: 5px 2px; cursor: pointer; z-index: 1; }
+  .gBar.human { background: #5b8def; }
+  .gBar.ai { background: #3aa675; }
+  .gBar.both { background: #9b6bd6; }
+  .gBar.done, .gLabel.done { opacity: .4; }
+  .gOut { grid-column: 2 / -1; grid-row: 1; font-size: 11px; color: #99a; padding: 0 6px; z-index: 1; }
+  /* 設計チケットの期日印 (読み取り専用。正本は本棚なのでドラッグ不可) */
+  .gDue { grid-row: 1; height: 14px; background: #d9932c; border-radius: 3px; margin: 6px 3px; z-index: 1; }
+  .gDue.done { opacity: .35; }
+  .gDue.overdue { background: #c0392b; box-shadow: 0 0 0 2px #f5c6c0; }
+
+  #main { flex: 1; display: flex; min-height: 0; }
+  #grid { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: auto repeat(6, minmax(72px, 1fr)); overflow: auto; }
+
+  /* 今後の予定パネル */
+  #panel { width: 240px; border-left: 1px solid #dde3ec; overflow: auto; background: #fafbfd; }
+  #panel h2 { margin: 0; padding: 8px 12px; font-size: 13px; color: #556; border-bottom: 1px solid #dde3ec; }
+  #panel .empty { padding: 12px; font-size: 12px; color: #99a; }
+  #panel .up { display: block; width: 100%; text-align: left; border: none; background: none; cursor: pointer; padding: 6px 12px; font-size: 12px; border-bottom: 1px solid #eef1f6; font-family: inherit; }
+  #panel .up:hover { background: #eef4fd; }
+  #panel .up .when { color: #556; }
+  #panel .up .what { color: #223; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell.dropTarget { outline: 2px solid #5b8def; outline-offset: -2px; background: #eef4fd; }
+  .dow { padding: 4px; text-align: center; font-size: 12px; color: #667; border-bottom: 1px solid #dde3ec; background: #fafbfd; }
+  .dow.sun { color: #c0392b; }
+  .dow.sat { color: #2e6bb8; }
+  /* 予定が多い日も隠さない: セル内スクロールで全件に到達できる */
+  .cell { border-right: 1px solid #eef1f6; border-bottom: 1px solid #eef1f6; padding: 3px 4px; min-height: 72px; overflow-y: auto; cursor: pointer; }
+  .item.dragging { opacity: .4; }
+  .cell:hover { background: #f6f9ff; }
+  .cell .day { font-size: 12px; color: #556; }
+  .cell.other { background: #fafafa; }
+  .cell.other .day { color: #bbb; }
+  .cell.today .day { display: inline-block; background: #5b8def; color: #fff; border-radius: 10px; padding: 0 6px; }
+  .cell .day.sun { color: #c0392b; }
+  .cell .day.sat { color: #2e6bb8; }
+  .item { font-size: 11px; background: #e8f0fe; border-left: 3px solid #5b8def; border-radius: 3px; padding: 1px 4px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item:hover { background: #d5e4fd; }
+
+  dialog { border: 1px solid #c8d2e0; border-radius: 10px; padding: 16px 18px; width: 320px; }
+  dialog::backdrop { background: rgba(0,0,0,.25); }
+  dialog h2 { margin: 0 0 12px; font-size: 15px; }
+  dialog label { display: block; font-size: 12px; color: #556; margin: 8px 0 2px; }
+  dialog input, dialog textarea { width: 100%; border: 1px solid #c8d2e0; border-radius: 6px; padding: 5px 8px; font-size: 13px; font-family: inherit; }
+  dialog textarea { height: 60px; resize: vertical; }
+  #dlgButtons, #tButtons { display: flex; gap: 8px; margin-top: 14px; }
+  #dlgButtons button, #tButtons button { border: 1px solid #c8d2e0; background: #f6f8fb; border-radius: 6px; padding: 5px 14px; font-size: 13px; cursor: pointer; }
+  #dlgSave { background: #5b8def; color: #fff; border-color: #5b8def; }
+  #dlgDelete { color: #c0392b; margin-right: auto; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <button id="prev">◀</button>
+  <span id="monthLabel"></span>
+  <button id="next">▶</button>
+  <button id="today">今日</button>
+  <span class="seg">
+    <button id="viewCal">📅 カレンダー</button>
+    <button id="viewGantt">📊 ガント</button>
+  </span>
+  <select id="pjFilter" hidden title="PJ で絞り込む"></select>
+  <label id="hideDoneWrap" hidden title="完了の作業と期日を隠す (件数は残る)"><input type="checkbox" id="hideDone"> ✓を隠す</label>
+  <button id="addTask" hidden>＋作業</button>
+</div>
+<div id="main">
+  <div id="grid"></div>
+  <aside id="panel">
+    <h2>今後の予定</h2>
+    <div id="upcoming"></div>
+  </aside>
+</div>
+<div id="gantt"></div>
+
+<dialog id="tdlg">
+  <h2 id="tdlgTitle">作業の追加</h2>
+  <form method="dialog" id="tForm">
+    <label>作業</label><input type="text" id="tTitle" required maxlength="100">
+    <label>担当</label>
+    <select id="tAssignee">
+      <option value="human">👤 俺 (人間)</option>
+      <option value="ai">🤖 AI</option>
+      <option value="both">🤝 共同</option>
+    </select>
+    <label>PJ（任意。本棚の id と同じ語彙）</label>
+    <input type="text" id="tPj" list="pjList" maxlength="40" placeholder="master など">
+    <datalist id="pjList"></datalist>
+    <label>開始</label><input type="date" id="tStart" required>
+    <label>終了</label><input type="date" id="tEnd" required>
+    <label><input type="checkbox" id="tDone"> 完了</label>
+    <label>メモ（任意）</label><textarea id="tMemo"></textarea>
+    <div id="tButtons">
+      <button type="button" id="tDelete" style="color:#c0392b;margin-right:auto" hidden>削除</button>
+      <button type="button" id="tCancel">キャンセル</button>
+      <button type="submit" id="tSave" style="background:#5b8def;color:#fff;border-color:#5b8def">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg">
+  <h2 id="dlgTitle">予定の追加</h2>
+  <form method="dialog" id="dlgForm">
+    <label>日付</label><input type="date" id="fDate" required>
+    <label>時刻（任意）</label><input type="time" id="fTime">
+    <label>タイトル</label><input type="text" id="fTitle" required maxlength="100">
+    <label>メモ（任意）</label><textarea id="fMemo"></textarea>
+    <div id="dlgButtons">
+      <button type="button" id="dlgDelete" hidden>削除</button>
+      <button type="button" id="dlgCancel">キャンセル</button>
+      <button type="submit" id="dlgSave">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  const grid = document.getElementById("grid");
+  const monthLabel = document.getElementById("monthLabel");
+  const dlg = document.getElementById("dlg");
+  const fDate = document.getElementById("fDate");
+  const fTime = document.getElementById("fTime");
+  const fTitle = document.getElementById("fTitle");
+  const fMemo = document.getElementById("fMemo");
+  const dlgDelete = document.getElementById("dlgDelete");
+
+  let items = [];
+  let tasks = []; // 開発計画 (ガント) の作業
+  let year, month; // month: 0-11
+  let editingId = null;
+  let view = "cal"; // cal | gantt。選んだビューは記憶する
+  try { view = localStorage.getItem("sched.view") || "cal"; } catch {}
+  let ganttStart; // ガント表示窓の先頭日 (Date)
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const key = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+  const dkey = (d) => key(d.getFullYear(), d.getMonth(), d.getDate());
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const diffDays = (a, b) => Math.round((b - a) / 86400000); // a,b は 0 時の Date
+
+  // ビューに応じて描き直す入口を 1 つに集める
+  function refresh() {
+    document.getElementById("main").classList.toggle("hide", view !== "cal");
+    document.getElementById("gantt").classList.toggle("show", view === "gantt");
+    document.getElementById("viewCal").classList.toggle("on", view === "cal");
+    document.getElementById("viewGantt").classList.toggle("on", view === "gantt");
+    document.getElementById("addTask").hidden = view !== "gantt";
+    document.getElementById("pjFilter").hidden = view !== "gantt";
+    document.getElementById("hideDoneWrap").hidden = view !== "gantt";
+    if (view === "cal") render();
+    else renderGantt();
+  }
+
+  async function load() {
+    items = (await fetch("/api/schedule").then((r) => r.json())).items;
+    refresh();
+    // シェルの「今日 n 件」バッジを即時更新させる (アプリ→シェル連携の最小形)
+    if (window.parent !== window) window.parent.postMessage({ type: "schedule-changed" }, location.origin);
+  }
+
+  let deadlines = []; // 設計チケットの期日 (git 正本由来、読み取り専用)
+  let pjNames = {}; // 本棚 id → 表示名
+  let pjFilter = ""; // "" = すべて。選択は記憶する
+  try { pjFilter = localStorage.getItem("sched.pj") || ""; } catch {}
+
+  async function loadPlan() {
+    let shelves = [];
+    [tasks, deadlines, shelves] = await Promise.all([
+      fetch("/api/plan").then((r) => r.json()).then((d) => d.tasks),
+      fetch("/api/shelf-deadlines").then((r) => r.json()).then((d) => d.deadlines).catch(() => []),
+      fetch("/api/shelves").then((r) => r.json()).then((d) => d.shelves).catch(() => []),
+    ]);
+    pjNames = Object.fromEntries(shelves.map((s) => [s.id, s.name]));
+    rebuildPjChoices();
+    refresh();
+  }
+
+  const pjLabel = (pj) => pjNames[pj] || pj;
+
+  // PJ セレクタと datalist の選択肢 = 本棚一覧 + 作業・期日に現れる pj の合成
+  function rebuildPjChoices() {
+    const known = new Set([
+      ...Object.keys(pjNames),
+      ...tasks.map((t) => t.pj).filter(Boolean),
+      ...deadlines.map((d) => d.pj).filter(Boolean),
+    ]);
+    const sel = document.getElementById("pjFilter");
+    sel.innerHTML = "";
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "PJ: すべて";
+    sel.appendChild(all);
+    for (const pj of [...known].sort()) {
+      const o = document.createElement("option");
+      o.value = pj;
+      o.textContent = `PJ: ${pjLabel(pj)}`;
+      sel.appendChild(o);
+    }
+    if (pjFilter && !known.has(pjFilter)) pjFilter = ""; // 消えた PJ を選び続けない
+    sel.value = pjFilter;
+    const dl = document.getElementById("pjList");
+    dl.innerHTML = "";
+    for (const pj of [...known].sort()) {
+      const o = document.createElement("option");
+      o.value = pj;
+      dl.appendChild(o);
+    }
+  }
+  document.getElementById("pjFilter").addEventListener("change", (e) => {
+    pjFilter = e.target.value;
+    try { localStorage.setItem("sched.pj", pjFilter); } catch {}
+    refresh();
+  });
+
+  // ✓ 完了を隠す (件数では見せ続ける)。選択は記憶
+  let hideDone = false;
+  try { hideDone = localStorage.getItem("sched.hideDone") === "1"; } catch {}
+  const hideDoneBox = document.getElementById("hideDone");
+  hideDoneBox.checked = hideDone;
+  hideDoneBox.addEventListener("change", () => {
+    hideDone = hideDoneBox.checked;
+    try { localStorage.setItem("sched.hideDone", hideDone ? "1" : "0"); } catch {}
+    refresh();
+  });
+
+  function render() {
+    monthLabel.textContent = `${year}年${month + 1}月`;
+    grid.innerHTML = "";
+    for (const [i, name] of ["日", "月", "火", "水", "木", "金", "土"].entries()) {
+      const el = document.createElement("div");
+      el.className = "dow" + (i === 0 ? " sun" : i === 6 ? " sat" : "");
+      el.textContent = name;
+      grid.appendChild(el);
+    }
+    const first = new Date(year, month, 1);
+    const start = new Date(year, month, 1 - first.getDay());
+    const todayKey = key(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+    // 月をまたぐ週も欠けなく描くため 6 週ぶん描画する
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const dk = key(d.getFullYear(), d.getMonth(), d.getDate());
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      if (d.getMonth() !== month) cell.classList.add("other");
+      if (dk === todayKey) cell.classList.add("today");
+      const day = document.createElement("span");
+      day.className = "day" + (d.getDay() === 0 ? " sun" : d.getDay() === 6 ? " sat" : "");
+      day.textContent = d.getDate();
+      cell.appendChild(day);
+      const dayItems = items
+        .filter((x) => x.date === dk)
+        .sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+      for (const it of dayItems) {
+        const el = document.createElement("div");
+        el.className = "item";
+        el.textContent = (it.time ? it.time + " " : "") + it.title;
+        el.title = it.memo || it.title;
+        el.draggable = true;
+        el.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", it.id);
+          e.dataTransfer.effectAllowed = "move";
+          el.classList.add("dragging"); // 何を掴んでいるか元の位置で分かるように
+        });
+        el.addEventListener("dragend", () => el.classList.remove("dragging"));
+        el.addEventListener("click", (e) => { e.stopPropagation(); openDialog(it); });
+        cell.appendChild(el);
+      }
+      // ドラッグで落とすと date だけ変更。楽観更新はせず、保存の応答後に再描画する
+      cell.addEventListener("dragover", (e) => { e.preventDefault(); cell.classList.add("dropTarget"); });
+      cell.addEventListener("dragleave", () => cell.classList.remove("dropTarget"));
+      cell.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        cell.classList.remove("dropTarget");
+        const id = e.dataTransfer.getData("text/plain");
+        if (!id) return;
+        try {
+          const res = await fetch(`/api/schedule/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date: dk }),
+          });
+          if (!res.ok) throw new Error((await res.json()).error || res.status);
+        } catch (err) {
+          alert("移動できませんでした: " + err.message + "\n予定は元の日のままです。");
+        }
+        load();
+      });
+      cell.addEventListener("click", () => openDialog({ date: dk }));
+      grid.appendChild(cell);
+    }
+    renderUpcoming(todayKey);
+  }
+
+  // 今日以降の予定を時系列で一覧表示。クリックで編集ダイアログを開く
+  function renderUpcoming(todayKey) {
+    const box = document.getElementById("upcoming");
+    box.innerHTML = "";
+    const dows = ["日", "月", "火", "水", "木", "金", "土"];
+    const list = items
+      .filter((x) => x.date >= todayKey)
+      .sort((a, b) => (a.date + (a.time || "99")).localeCompare(b.date + (b.time || "99")));
+    if (list.length === 0) {
+      const el = document.createElement("div");
+      el.className = "empty";
+      el.textContent = "予定はありません";
+      box.appendChild(el);
+      return;
+    }
+    for (const it of list) {
+      const [y, m, d] = it.date.split("-").map(Number);
+      const dow = dows[new Date(y, m - 1, d).getDay()];
+      const btn = document.createElement("button");
+      btn.className = "up";
+      btn.type = "button";
+      const when = document.createElement("div");
+      when.className = "when";
+      when.textContent = `${m}/${d} (${dow})` + (it.time ? ` ${it.time}` : "");
+      const what = document.createElement("div");
+      what.className = "what";
+      what.textContent = it.title;
+      btn.append(when, what);
+      btn.addEventListener("click", () => openDialog(it));
+      box.appendChild(btn);
+    }
+  }
+
+  // ---- ガント描画 ----
+
+  const GANTT_SPAN = 28;
+  const SECTIONS = [
+    ["human", "👤 俺の作業"],
+    ["ai", "🤖 AI の作業"],
+    ["both", "🤝 共同"],
+  ];
+
+  function renderGantt() {
+    const g = document.getElementById("gantt");
+    g.innerHTML = "";
+    const days = [...Array(GANTT_SPAN)].map((_, i) => addDays(ganttStart, i));
+    const last = days[GANTT_SPAN - 1];
+    monthLabel.textContent =
+      `${ganttStart.getMonth() + 1}/${ganttStart.getDate()} 〜 ${last.getMonth() + 1}/${last.getDate()}`;
+    const todayK = dkey(new Date());
+
+    const head = document.createElement("div");
+    head.className = "gRow gHead";
+    const corner = document.createElement("div");
+    corner.className = "gLabel";
+    corner.textContent = "作業 (クリックで編集)";
+    head.appendChild(corner);
+    for (const d of days) {
+      const c = document.createElement("div");
+      c.className = "gDay" + (d.getDay() % 6 === 0 ? " we" : "") + (dkey(d) === todayK ? " today" : "");
+      // 月初と窓の先頭だけ月も出す (どの月か迷子にならないように)
+      c.textContent = d.getDate() === 1 || d === days[0] ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate();
+      head.appendChild(c);
+    }
+    g.appendChild(head);
+
+    const startK = dkey(ganttStart);
+    const lastK = dkey(last);
+    // PJ 絞り込み: 特定 PJ では pj なしの作業も出さない (どの PJ にも属さないため)
+    const visTasks = pjFilter ? tasks.filter((t) => t.pj === pjFilter) : tasks;
+    const visDeadlines = pjFilter ? deadlines.filter((d) => d.pj === pjFilter) : deadlines;
+    for (const [assignee, label] of SECTIONS) {
+      const allTasks = visTasks
+        .filter((t) => t.assignee === assignee)
+        .sort((a, b) => (a.start + a.id).localeCompare(b.start + b.id));
+      // 隠しても「残 n / 全 m」で完了の存在は見せる (実績が消えたように見せない)
+      const secTasks = hideDone ? allTasks.filter((t) => !t.done) : allTasks;
+      const sec = document.createElement("div");
+      sec.className = "gSec";
+      sec.textContent = `${label} ${hideDone ? `(残 ${secTasks.length} / 全 ${allTasks.length})` : `(${allTasks.length})`}`;
+      g.appendChild(sec);
+      for (const t of secTasks) {
+        const row = document.createElement("div");
+        row.className = "gRow";
+        const lbl = document.createElement("div");
+        lbl.className = "gLabel" + (t.done ? " done" : "");
+        // 「すべて」表示では [PJ] を頭に付けてどの開発の話か分かるようにする
+        const pjTag = !pjFilter && t.pj ? `[${pjLabel(t.pj)}] ` : "";
+        lbl.textContent = (t.done ? "✓ " : "") + pjTag + t.title;
+        lbl.title = `${t.title}\n${t.start} 〜 ${t.end}${t.pj ? `\nPJ: ${pjLabel(t.pj)}` : ""}${t.memo ? "\n" + t.memo : ""}`;
+        lbl.addEventListener("click", () => openTaskDialog(t));
+        row.appendChild(lbl);
+        for (const [i, d] of days.entries()) {
+          const bg = document.createElement("div");
+          bg.className = "gBg" + (d.getDay() % 6 === 0 ? " we" : "") + (dkey(d) === todayK ? " today" : "");
+          bg.style.gridColumn = String(2 + i);
+          row.appendChild(bg);
+        }
+        if (t.end < startK || t.start > lastK) {
+          // 窓と交差しない作業も行は必ず出す (存在ごと忘れられないように)
+          const out = document.createElement("div");
+          out.className = "gOut";
+          out.textContent = `（窓外: ${t.start} 〜 ${t.end}。◀▶ で移動）`;
+          row.appendChild(out);
+        } else {
+          const bar = document.createElement("div");
+          bar.className = `gBar ${t.assignee}` + (t.done ? " done" : "");
+          bar.style.gridColumn = barColumns(t, 0, "move");
+          bar.title = lbl.title;
+          bar.addEventListener("click", () => {
+            // ドラッグ直後に飛んでくる click で編集が開かないようにする
+            if (suppressClick) { suppressClick = false; return; }
+            openTaskDialog(t);
+          });
+          attachBarDrag(bar, t);
+          row.appendChild(bar);
+        }
+        g.appendChild(row);
+      }
+    }
+
+    // 設計チケットの期日レーン (1 件も無ければレーンごと出さない)
+    const shownDeadlines = hideDone ? visDeadlines.filter((d) => !d.done) : visDeadlines;
+    if (visDeadlines.length > 0) {
+      const sec = document.createElement("div");
+      sec.className = "gSec";
+      sec.textContent = `📚 設計チケットの期日 ${hideDone ? `(残 ${shownDeadlines.length} / 全 ${visDeadlines.length})` : `(${visDeadlines.length})`}`;
+      g.appendChild(sec);
+      for (const d of shownDeadlines) {
+        const row = document.createElement("div");
+        row.className = "gRow";
+        const lbl = document.createElement("div");
+        lbl.className = "gLabel" + (d.done ? " done" : "");
+        lbl.textContent = `${d.done ? "✓ " : ""}${d.shelf} #${d.key} ${d.title}`;
+        lbl.title = `期日 ${d.due}\n編集は本棚 (正本) で`;
+        row.appendChild(lbl);
+        for (const [i, day] of days.entries()) {
+          const bg = document.createElement("div");
+          bg.className = "gBg" + (day.getDay() % 6 === 0 ? " we" : "") + (dkey(day) === todayK ? " today" : "");
+          bg.style.gridColumn = String(2 + i);
+          row.appendChild(bg);
+        }
+        const idx = diffDays(ganttStart, new Date(d.due + "T00:00"));
+        if (idx < 0 || idx >= GANTT_SPAN) {
+          const out = document.createElement("div");
+          out.className = "gOut";
+          out.textContent = `（窓外: 期日 ${d.due}。◀▶ で移動）`;
+          row.appendChild(out);
+        } else {
+          const mark = document.createElement("div");
+          mark.className = "gDue" + (d.done ? " done" : "") + (!d.done && d.due < todayK ? " overdue" : "");
+          mark.style.gridColumn = String(2 + idx);
+          mark.title = lbl.title;
+          row.appendChild(mark);
+        }
+        g.appendChild(row);
+      }
+    }
+  }
+
+  // ---- ガントバーのドラッグ (中央=移動 / 左右端 8px=伸縮) ----
+
+  const EDGE = 8; // 伸縮ゾーンの幅 (px)
+  let drag = null; // { task, mode, startX, colW, bar, delta }
+  let suppressClick = false;
+
+  // 日数差 delta とモードを適用したときの grid-column を返す (表示窓にクランプ)
+  function barColumns(t, delta, mode) {
+    let s = diffDays(ganttStart, new Date(t.start + "T00:00"));
+    let e = diffDays(ganttStart, new Date(t.end + "T00:00"));
+    if (mode === "move") { s += delta; e += delta; }
+    else if (mode === "start") s = Math.min(s + delta, e); // 開始 ≦ 終了を守る
+    else if (mode === "end") e = Math.max(e + delta, s);
+    const cs = Math.max(0, s);
+    const ce = Math.min(GANTT_SPAN - 1, e);
+    return `${2 + cs} / ${3 + ce}`;
+  }
+
+  function dragMode(bar, x) {
+    const r = bar.getBoundingClientRect();
+    if (x - r.left < EDGE) return "start";
+    if (r.right - x < EDGE) return "end";
+    return "move";
+  }
+
+  function attachBarDrag(bar, t) {
+    // ホバー中は掴める場所をカーソルで示す
+    bar.addEventListener("pointermove", (e) => {
+      if (drag) return;
+      const m = dragMode(bar, e.clientX);
+      bar.style.cursor = m === "move" ? "grab" : "ew-resize";
+    });
+    bar.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      bar.setPointerCapture(e.pointerId);
+      const colW = bar.parentElement.querySelector(".gBg").getBoundingClientRect().width;
+      drag = { task: t, mode: dragMode(bar, e.clientX), startX: e.clientX, colW, bar, delta: 0 };
+    });
+    bar.addEventListener("pointermove", (e) => {
+      if (!drag || drag.bar !== bar) return;
+      const delta = Math.round((e.clientX - drag.startX) / drag.colW); // 1 日 = 1 列に丸める
+      if (delta !== drag.delta) {
+        drag.delta = delta;
+        bar.style.gridColumn = barColumns(t, delta, drag.mode); // その場でプレビュー
+      }
+    });
+    bar.addEventListener("pointerup", async () => {
+      if (!drag || drag.bar !== bar) return;
+      const { mode, delta } = drag;
+      drag = null;
+      if (delta === 0) return; // 動かしていない → 通常クリック (編集ダイアログ) に任せる
+      suppressClick = true;
+      const shift = (dstr, n) => dkey(addDays(new Date(dstr + "T00:00"), n));
+      const body =
+        mode === "move" ? { start: shift(t.start, delta), end: shift(t.end, delta) }
+        : mode === "start" ? { start: shift(t.start, Math.min(delta, diffDays(new Date(t.start + "T00:00"), new Date(t.end + "T00:00")))) }
+        : { end: shift(t.end, Math.max(delta, -diffDays(new Date(t.start + "T00:00"), new Date(t.end + "T00:00")))) };
+      try {
+        const res = await fetch(`/api/plan/${t.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (!res.ok) throw new Error((await res.json()).error || res.status);
+      } catch (err) {
+        alert("動かせませんでした: " + err.message + "\n日程は元のままです。");
+      }
+      loadPlan(); // 成功なら確定表示、失敗ならプレビューを巻き戻す
+    });
+  }
+  // ドラッグ中に Esc でキャンセル (保存せず元の位置へ)
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drag) {
+      drag.bar.style.gridColumn = barColumns(drag.task, 0, "move");
+      drag = null;
+      suppressClick = true;
+    }
+  });
+
+  // ---- 作業ダイアログ ----
+
+  const tdlg = document.getElementById("tdlg");
+  const tTitle = document.getElementById("tTitle");
+  const tAssignee = document.getElementById("tAssignee");
+  const tStart = document.getElementById("tStart");
+  const tEnd = document.getElementById("tEnd");
+  const tDone = document.getElementById("tDone");
+  const tMemo = document.getElementById("tMemo");
+  const tPj = document.getElementById("tPj");
+  const tDelete = document.getElementById("tDelete");
+  let editingTaskId = null;
+
+  function openTaskDialog(t) {
+    editingTaskId = t.id || null;
+    document.getElementById("tdlgTitle").textContent = editingTaskId ? "作業の編集" : "作業の追加";
+    tDelete.hidden = !editingTaskId;
+    tTitle.value = t.title || "";
+    tAssignee.value = t.assignee || "human";
+    tStart.value = t.start;
+    tEnd.value = t.end;
+    tDone.checked = !!t.done;
+    tMemo.value = t.memo || "";
+    // 新規作成で PJ 絞り込み中なら、その PJ を初期値にする
+    tPj.value = t.pj !== undefined ? t.pj : editingTaskId ? "" : pjFilter;
+    tdlg.showModal();
+    tTitle.focus();
+  }
+
+  document.getElementById("tForm").addEventListener("submit", async () => {
+    const body = {
+      title: tTitle.value,
+      assignee: tAssignee.value,
+      start: tStart.value,
+      end: tEnd.value,
+      done: tDone.checked,
+      memo: tMemo.value,
+      pj: tPj.value.trim(),
+    };
+    const res = editingTaskId
+      ? await fetch(`/api/plan/${editingTaskId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      : await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) alert((await res.json()).error || "保存に失敗しました");
+    loadPlan();
+  });
+  document.getElementById("tCancel").addEventListener("click", () => tdlg.close());
+  tDelete.addEventListener("click", async () => {
+    await fetch(`/api/plan/${editingTaskId}`, { method: "DELETE" });
+    tdlg.close();
+    loadPlan();
+  });
+  document.getElementById("addTask").addEventListener("click", () => {
+    const t = new Date();
+    openTaskDialog({ start: dkey(t), end: dkey(addDays(t, 2)) });
+  });
+
+  function setView(v) {
+    view = v;
+    try { localStorage.setItem("sched.view", v); } catch {}
+    refresh();
+  }
+  document.getElementById("viewCal").addEventListener("click", () => setView("cal"));
+  document.getElementById("viewGantt").addEventListener("click", () => setView("gantt"));
+
+  function openDialog(it) {
+    editingId = it.id || null;
+    document.getElementById("dlgTitle").textContent = editingId ? "予定の編集" : "予定の追加";
+    dlgDelete.hidden = !editingId;
+    fDate.value = it.date;
+    fTime.value = it.time || "";
+    fTitle.value = it.title || "";
+    fMemo.value = it.memo || "";
+    dlg.showModal();
+    fTitle.focus();
+  }
+
+  document.getElementById("dlgForm").addEventListener("submit", async () => {
+    const body = { date: fDate.value, time: fTime.value, title: fTitle.value, memo: fMemo.value };
+    const res = editingId
+      ? await fetch(`/api/schedule/${editingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      : await fetch("/api/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) alert((await res.json()).error || "保存に失敗しました");
+    load();
+  });
+  document.getElementById("dlgCancel").addEventListener("click", () => dlg.close());
+  dlgDelete.addEventListener("click", async () => {
+    await fetch(`/api/schedule/${editingId}`, { method: "DELETE" });
+    dlg.close();
+    load();
+  });
+
+  // ◀▶ はカレンダーでは月、ガントでは 1 週間ずつ動かす
+  document.getElementById("prev").addEventListener("click", () => {
+    if (view === "cal") { month--; if (month < 0) { month = 11; year--; } }
+    else ganttStart = addDays(ganttStart, -7);
+    refresh();
+  });
+  document.getElementById("next").addEventListener("click", () => {
+    if (view === "cal") { month++; if (month > 11) { month = 0; year++; } }
+    else ganttStart = addDays(ganttStart, 7);
+    refresh();
+  });
+  document.getElementById("today").addEventListener("click", () => {
+    const n = new Date();
+    year = n.getFullYear();
+    month = n.getMonth();
+    ganttStart = addDays(n, -3);
+    refresh();
+  });
+
+  const now = new Date();
+  year = now.getFullYear();
+  month = now.getMonth();
+  ganttStart = addDays(now, -3); // 直近の実績も少し見えるよう 3 日前から
+  load();
+  loadPlan();
+})();
+</script>
+</body>
+</html>

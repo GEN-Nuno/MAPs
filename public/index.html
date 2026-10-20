@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232b3a55'/%3E%3Ctext x='32' y='44' font-size='34' font-family='Segoe UI,sans-serif' font-weight='bold' fill='%23fff' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bar-h: 44px;
+    --bar-bg: #2b3a55;
+    --bar-fg: #f2f5fa;
+    --drawer-bg: #1f2b40;
+    --accent: #5b8def;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: "Segoe UI", "Yu Gothic UI", sans-serif; background: #eef1f5; overflow: hidden; }
+
+  header {
+    height: var(--bar-h);
+    background: var(--bar-bg);
+    color: var(--bar-fg);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+  }
+  #menuBtn {
+    font-size: 20px;
+    background: none;
+    border: none;
+    color: var(--bar-fg);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  #menuBtn:hover { background: rgba(255,255,255,.15); }
+  #appTitle { font-size: 15px; font-weight: 600; }
+  #docStatus { margin-left: auto; font-size: 12px; opacity: .8; }
+  /* 動いているコードと起動時刻 (MS-19)。改修が反映されたかをここで確かめる */
+  #buildInfo { font-size: 11px; opacity: .6; white-space: nowrap; }
+  #buildInfo.stale { opacity: 1; color: #ffd27a; }
+
+  /* Map 表示中だけ出す本棚セレクタ。「開く指示」専用で選択状態は持たない */
+  #shelfSelect {
+    margin-left: 12px;
+    background: rgba(255,255,255,.12);
+    color: var(--bar-fg);
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 6px;
+    font-size: 12px;
+    padding: 3px 6px;
+    max-width: 180px;
+  }
+  #shelfSelect option { color: #223; }
+
+  /* ヘッダー常設タブ: 1 クリックで切替できる主動線 */
+  #tabs { display: flex; gap: 2px; margin-left: 14px; align-self: stretch; }
+  #tabs button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: rgba(242,245,250,.75);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #tabs button:hover { background: rgba(255,255,255,.10); color: var(--bar-fg); }
+  #tabs button.active { border-bottom-color: var(--accent); color: var(--bar-fg); font-weight: 600; }
+  /* 起動済み (iframe 保持中) のアプリに点く緑ドット */
+  #tabs .dot { width: 7px; height: 7px; border-radius: 50%; background: #4caf78; display: none; }
+  #tabs button.running .dot { display: inline-block; }
+  #tabs button.warn::after { content: "⚠"; font-size: 11px; }
+  /* 今日の予定バッジ: 開かなくても存在に気づけるようにする */
+  #tabs .badge {
+    background: #e05252;
+    color: #fff;
+    border-radius: 9px;
+    font-size: 10px;
+    line-height: 15px;
+    min-width: 15px;
+    padding: 0 4px;
+    text-align: center;
+  }
+
+  /* ドロワー（ハンバーガーメニュー） */
+  #drawer {
+    position: fixed;
+    top: var(--bar-h);
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    background: var(--drawer-bg);
+    color: #dfe6f2;
+    transform: translateX(-100%);
+    transition: transform .18s ease;
+    z-index: 20;
+    padding-top: 8px;
+  }
+  #drawer.open { transform: translateX(0); }
+  #drawer button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 18px;
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+  }
+  #drawer button:hover { background: rgba(255,255,255,.08); }
+  #drawer button.active { background: rgba(91,141,239,.25); border-left: 3px solid var(--accent); padding-left: 15px; }
+  #drawer .icon { font-size: 18px; width: 22px; text-align: center; }
+  #drawer kbd {
+    margin-left: auto;
+    font-family: inherit;
+    font-size: 11px;
+    color: rgba(223,230,242,.55);
+    border: 1px solid rgba(223,230,242,.25);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  #overlay {
+    position: fixed;
+    inset: var(--bar-h) 0 0 0;
+    background: rgba(0,0,0,.25);
+    z-index: 10;
+    display: none;
+  }
+  #overlay.show { display: block; }
+
+  /* アプリ表示領域: iframe は切替時も破棄せず隠すだけ（並行動作・状態保持のため） */
+  #stage { position: absolute; top: var(--bar-h); left: 0; right: 0; bottom: 0; }
+  #stage iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: none;
+    background: #fff;
+  }
+  #stage iframe.active { display: block; }
+  /* 初回のランチャーカード: 行き止まりにせず、画面自体が次の操作を示す */
+  #launcher {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 24px;
+  }
+  #launcher.show { display: flex; }
+  #launcher .card {
+    width: 200px;
+    padding: 26px 18px 20px;
+    background: #fff;
+    border: 1px solid #d8dfe9;
+    border-radius: 14px;
+    cursor: pointer;
+    text-align: center;
+    font-family: inherit;
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  #launcher .card:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(43,58,85,.15); border-color: var(--accent); }
+  #launcher .card .icon { font-size: 40px; }
+  #launcher .card .name { font-size: 15px; font-weight: 600; color: #2b3a55; margin-top: 10px; }
+  #launcher .card .desc { font-size: 12px; color: #667; margin-top: 6px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <button id="menuBtn" title="メニュー">☰</button>
+  <span id="appTitle">Master</span>
+  <nav id="tabs">
+    <button data-app="map" title="Map（設計本棚） Ctrl+1">🗺️ Map<span class="dot"></span></button>
+    <button data-app="document" title="Document（文書） Ctrl+2">📄 Document<span class="dot"></span></button>
+    <button data-app="schedule" title="Schedule（予定） Ctrl+3">📅 Schedule<span id="schedBadge" class="badge" hidden></span><span class="dot"></span></button>
+    <button data-app="quality" title="品質（非機能要件） Ctrl+4">🛡 品質<span class="dot"></span></button>
+  </nav>
+  <select id="shelfSelect" hidden title="Map で開く設計本棚を切り替える"></select>
+  <span id="docStatus"></span>
+  <span id="buildInfo" title="動いているサーバーのコードと起動時刻"></span>
+</header>
+
+<nav id="drawer">
+  <button data-app="map"><span class="icon">🗺️</span>Map（設計本棚）<kbd>Ctrl+1</kbd></button>
+  <button data-app="document"><span class="icon">📄</span>Document（文書）<kbd>Ctrl+2</kbd></button>
+  <button data-app="schedule"><span class="icon">📅</span>Schedule（予定）<kbd>Ctrl+3</kbd></button>
+  <button data-app="quality"><span class="icon">🛡</span>品質（非機能要件）<kbd>Ctrl+4</kbd></button>
+</nav>
+<div id="overlay"></div>
+
+<div id="stage">
+  <div id="launcher" class="show">
+    <button class="card" data-app="map">
+      <div class="icon">🗺️</div>
+      <div class="name">Map</div>
+      <div class="desc">設計本棚 (SeqShelf)。シーケンス図とチケットで設計を読む・書く</div>
+    </button>
+    <button class="card" data-app="document">
+      <div class="icon">📄</div>
+      <div class="name">Document</div>
+      <div class="desc">Markdown 文書を見たまま編集。差分・図の挿入も</div>
+    </button>
+    <button class="card" data-app="schedule">
+      <div class="icon">📅</div>
+      <div class="name">Schedule</div>
+      <div class="desc">月間カレンダーで予定を立てる。ドラッグで移動</div>
+    </button>
+    <button class="card" data-app="quality">
+      <div class="icon">🛡</div>
+      <div class="name">品質</div>
+      <div class="desc">非機能要件のクリア状況を全 PJ 横断で見る</div>
+    </button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const APPS = {
+    map:      { title: "Map（設計本棚）", short: "Map", src: "/map/" },
+    document: { title: "Document（文書）", short: "Document", src: null }, // ポートは /api/config から取得
+    schedule: { title: "Schedule（予定）", short: "Schedule", src: "/schedule.html" },
+    quality:  { title: "品質（非機能要件）", short: "品質", src: "/quality.html" },
+  };
+  const drawer = document.getElementById("drawer");
+  const overlay = document.getElementById("overlay");
+  const stage = document.getElementById("stage");
+  const launcher = document.getElementById("launcher");
+  const tabs = document.getElementById("tabs");
+  const appTitle = document.getElementById("appTitle");
+  const docStatus = document.getElementById("docStatus");
+  const frames = {}; // 生成済み iframe。切替では破棄しない
+  const APP_ORDER = ["map", "document", "schedule", "quality"]; // Ctrl+1〜4 の割り当て順
+  let current = null;
+  let documentUrl = null;
+
+  function setDrawer(open) {
+    drawer.classList.toggle("open", open);
+    overlay.classList.toggle("show", open);
+  }
+  document.getElementById("menuBtn").addEventListener("click", () =>
+    setDrawer(!drawer.classList.contains("open")));
+  overlay.addEventListener("click", () => setDrawer(false));
+
+  // document(docment) は子プロセスの起動を待ってから iframe を張る
+  async function waitFor(url, tries) {
+    for (let i = 0; i < tries; i++) {
+      try {
+        await fetch(url, { mode: "no-cors" });
+        return true;
+      } catch {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+    return false;
+  }
+
+  async function ensureFrame(name) {
+    const existing = frames[name];
+    // 失敗印付きの document は作り直さず、タブ再クリックのたびに接続だけやり直す
+    if (existing && !(name === "document" && existing.dataset.failed)) return existing;
+    const iframe = existing || document.createElement("iframe");
+    iframe.title = APPS[name].title;
+    if (name === "document") {
+      const docTab = tabs.querySelector('button[data-app="document"]');
+      docStatus.textContent = "document へ接続中…"; // 最大 10 秒の待ちを無応答にしない
+      const ok = await waitFor(documentUrl, 20);
+      if (ok) {
+        iframe.src = documentUrl;
+        delete iframe.dataset.failed;
+        docStatus.textContent = "";
+        docTab.classList.remove("warn");
+      } else {
+        iframe.src = "about:blank";
+        iframe.dataset.failed = "1";
+        docStatus.textContent = "⚠ document サーバーに接続できません (タブの再クリックで再試行)";
+        // タブ側にも ⚠ を出し、ヘッダー右端の文言を見ていなくても気づけるようにする
+        docTab.classList.add("warn");
+      }
+    } else {
+      iframe.src = APPS[name].src;
+    }
+    if (!existing) stage.appendChild(iframe);
+    frames[name] = iframe;
+    return iframe;
+  }
+
+  // 選択状態はタブ・ドロワーの両方へ毎回反映する (片方だけ残る不整合を作らない)
+  function syncNav() {
+    for (const btn of [...drawer.querySelectorAll("button"), ...tabs.querySelectorAll("button")]) {
+      btn.classList.toggle("active", btn.dataset.app === current);
+      const f = frames[btn.dataset.app];
+      // 失敗印付き (about:blank) は「起動済み」に数えない
+      if (btn.parentElement === tabs) btn.classList.toggle("running", !!f && !f.dataset.failed);
+    }
+    if (current) document.title = `${APPS[current].short} — Master`;
+    // 本棚セレクタは Map 表示中かつ一覧受信済みのときだけ出す
+    document.getElementById("shelfSelect").hidden = current !== "map" || !shelvesLoaded;
+  }
+
+  // Schedule タブの「今日 n 件」バッジ。起動時・10 分ごと・変更通知時に更新する
+  async function updateTodayBadge() {
+    const badge = document.getElementById("schedBadge");
+    try {
+      const { items } = await fetch("/api/schedule").then((r) => r.json());
+      const t = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const today = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+      const n = items.filter((x) => x.date === today).length;
+      badge.textContent = String(n);
+      badge.hidden = n === 0;
+    } catch {
+      badge.hidden = true; // 補助情報なので静かに諦め、エラーは出さない
+    }
+  }
+  // Map の本棚セレクタ。一覧は shelves フォルダ (正本) の走査 API で作る。
+  // フォルダが読めない環境では SeqShelf からの同梱一覧通知 (postMessage) で代替する。
+  const shelfSelect = document.getElementById("shelfSelect");
+  let shelvesLoaded = false; // "folder" | "bundled" | false
+  function fillShelfSelect(options, source) {
+    if (shelvesLoaded === "folder" && source === "bundled") return; // 正本一覧を同梱で上書きしない
+    shelfSelect.innerHTML = "";
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = "📚 本棚…";
+    shelfSelect.appendChild(ph);
+    for (const s of options) {
+      const o = document.createElement("option");
+      o.value = s.value;
+      o.textContent = s.label;
+      shelfSelect.appendChild(o);
+    }
+    shelvesLoaded = source;
+    shelfSelect.hidden = current !== "map";
+  }
+  async function loadShelfCatalog() {
+    try {
+      const { shelves } = await fetch("/api/shelves").then((r) => r.json());
+      if (shelves.length > 0) {
+        fillShelfSelect(
+          shelves.map((s) => ({ value: `url:/api/shelves/${s.id}`, label: s.name })),
+          "folder"
+        );
+      }
+    } catch {} // 失敗時は同梱一覧の通知に任せる
+  }
+  loadShelfCatalog();
+  shelfSelect.addEventListener("change", () => {
+    const v = shelfSelect.value;
+    shelfSelect.value = ""; // 指示専用: 選択状態を持たない (置換可否の確認は SeqShelf 側が出す)
+    if (!v || !frames.map) return;
+    frames.map.src = v.startsWith("url:")
+      ? `/map/?shelfUrl=${encodeURIComponent(v.slice(4))}`
+      : `/map/?shelf=${encodeURIComponent(v.slice(3))}`;
+  });
+
+  window.addEventListener("message", (e) => {
+    if (e.origin !== location.origin || !e.data) return;
+    if (e.data.type === "schedule-changed") updateTodayBadge();
+    if (e.data.type === "seqshelf-shelves")
+      fillShelfSelect((e.data.shelves || []).map((s) => ({ value: `id:${s.id}`, label: s.label })), "bundled");
+  });
+  setInterval(updateTodayBadge, 600000);
+  updateTodayBadge();
+
+  async function show(name) {
+    setDrawer(false);
+    current = name;
+    appTitle.textContent = APPS[name].title;
+    launcher.classList.remove("show");
+    syncNav();
+    const iframe = await ensureFrame(name);
+    if (current !== name) return; // 待機中に別アプリへ切り替えた場合は表示しない
+    for (const [n, f] of Object.entries(frames)) f.classList.toggle("active", n === name);
+    syncNav(); // 起動済みドットを反映
+    try { localStorage.setItem("master.lastApp", name); } catch {}
+  }
+
+  for (const btn of document.querySelectorAll("#drawer button, #tabs button, #launcher .card"))
+    btn.addEventListener("click", () => show(btn.dataset.app));
+
+  // Ctrl+1/2/3 で切替、Esc でドロワーを閉じる。
+  // iframe 内にフォーカスがある間はキーが親に届かない (既存アプリ不改変の割り切り)
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drawer.classList.contains("open")) {
+      setDrawer(false);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "4") {
+      e.preventDefault();
+      show(APP_ORDER[Number(e.key) - 1]);
+    }
+  });
+
+  // 動いているコードの表示 (MS-19)。取得できない = MS-19 より前のサーバーが動いている
+  (async () => {
+    const el = document.getElementById("buildInfo");
+    try {
+      const r = await fetch("/api/version");
+      if (!r.ok) throw new Error(String(r.status));
+      const v = await r.json();
+      const t = new Date(v.startedAt);
+      const pad = (n) => String(n).padStart(2, "0");
+      const ver = v.version ? `v${v.version}${v.bundled ? "" : " (開発版)"} · ` : "";
+      el.textContent = `${ver}コード ${v.signature} · 起動 ${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    } catch {
+      el.textContent = "⚠ 古いサーバーが動いています (起動.bat で入れ替え)";
+      el.classList.add("stale");
+    }
+  })();
+
+  (async () => {
+    const cfg = await fetch("/api/config").then((r) => r.json());
+    documentUrl = `http://localhost:${cfg.documentPort}/`;
+    let last = null;
+    try { last = localStorage.getItem("master.lastApp"); } catch {}
+    if (last && APPS[last]) show(last);
+  })();
+})();
+</script>
+</body>
+</html>
