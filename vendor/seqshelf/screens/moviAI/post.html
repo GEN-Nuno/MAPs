@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>moviAI post</title>
+<style>
+  body { margin: 0; background: #0e0f13; color: #e6e8ee; font: 13px system-ui, sans-serif; }
+  .shot { position: relative; width: 640px; height: 520px; }
+  .shot img { display: block; width: 640px; height: 520px; }
+  .cls { position: absolute; box-sizing: border-box; border: 1px dashed rgba(79,156,249,.55); }
+  .cls::after { content: attr(data-cls); position: absolute; left: 0; top: -18px; padding: 1px 6px; background: #2f6fd0; color: #fff; font-size: 11px; border-radius: 3px; opacity: 0; }
+  .cls:hover { border-color: #4f9cf9; background: rgba(79,156,249,.12); }
+  .cls:hover::after { opacity: 1; }
+  .cls.cls-hilite { border: 3px solid #4f9cf9; background: rgba(79,156,249,.18); box-shadow: 0 0 0 6px rgba(79,156,249,.25); }
+  .cls.cls-hilite::after { opacity: 1; }
+  .btn { position: absolute; box-sizing: border-box; border: 1px solid transparent; border-radius: 4px; }
+  .btn:hover { border-color: rgba(79,156,249,.7); }
+  .btn.cls-hilite { border: 3px solid #f0b358; box-shadow: 0 0 0 6px rgba(240,179,88,.3); background: rgba(240,179,88,.15); }
+  .note { padding: 6px 10px; color: #8a90a0; }
+</style></head><body>
+<div class="shot"><img src="post.png" alt="moviAI post">
+<div class="cls" data-cls="PostTextDialog" style="left:0px;top:0px;width:640px;height:520px" title="PostTextDialog"></div>
+<div class="btn" data-btn="コピー" style="left:549px;top:33px;width:80px;height:38px" title="コピー"></div>
+<div class="btn" data-btn="説明文をコピー" style="left:11px;top:471px;width:136px;height:38px" title="説明文をコピー"></div>
+<div class="btn" data-btn="保存…" style="left:153px;top:472px;width:76px;height:36px" title="保存…"></div>
+<div class="btn" data-btn="閉じる" style="left:549px;top:472px;width:80px;height:36px" title="閉じる"></div>
+</div>
+<div class="note">moviAI の実物の画面 (offscreen で撮影、640×520)。点線の枠が本棚の UI のクラスの領域。</div>
+<script>
+// SeqShelf の地図 (S-40) からの問い合わせ: 親からの message だけに応じる
+window.addEventListener("message", (e) => {
+  if (window.parent === window || e.source !== window.parent) return;
+  const d = e.data;
+  if (!d || typeof d !== "object") return;
+  if (d.type === "seqshelf-probe") {
+    const matched = d.selectors.filter((x) => { try { return !!document.querySelector(x.selector); } catch { return false; } }).map((x) => x.id);
+    const cls = [...new Set([...document.querySelectorAll("[data-cls]")].map((x) => x.dataset.cls))];
+    e.source.postMessage({ type: "seqshelf-probe-result", matched, cls }, "*");
+  } else if (d.type === "seqshelf-highlight") {
+    for (const x of document.querySelectorAll(".cls-hilite")) x.classList.remove("cls-hilite");
+    if (d.selector) { try { for (const h of document.querySelectorAll(d.selector)) h.classList.add("cls-hilite"); } catch {} }
+  }
+});
+</script>
+</body></html>

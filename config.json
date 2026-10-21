@@ -1,12 +1,12 @@
 {
   "port": 3945,
   "document": {
-    "serverJs": "C:/実務/document/server.js",
+    "serverJs": "vendor/document/server.js",
     "root": "C:/実務/document",
     "port": 3939
   },
   "map": {
-    "distHtml": "C:/map/map/dist/SeqShelf.html",
-    "shelvesDir": "C:/map/map/src/shelves"
+    "distHtml": "vendor/seqshelf/SeqShelf.html",
+    "shelvesDir": "vendor/shelves"
   }
 }

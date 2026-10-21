@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SeqShelf 画面の一覧</title>
+<style>
+  :root { --bg: #f4f5f7; --fg: #1c1e26; --muted: #6b7280; --panel: #fff; --line: #d8dbe2; --accent: #2563eb; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1e1e24; --fg: #e6e6ea; --muted: #9aa0ad; --panel: #25262d; --line: #3a3d48; --accent: #6fb1ff; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.7 -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p { max-width: 70ch; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; }
+  a.card { display: block; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); text-decoration: none; }
+  a.card:hover { border-color: var(--accent); }
+  a.card b { display: block; margin-bottom: 2px; }
+  a.card span { color: var(--muted); font-size: 12px; }
+  code { font-family: Consolas, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SeqShelf 画面の一覧</h1>
+  <p>どの画面も本番そのもの (SeqShelf.html) を開きます。設計書の絵ではなく、常に最新の実物です。開いたら <code>?</code> キーで説明モードに入ると、要素にカーソルを合わせた時にその役割が出ます。</p>
+  <div class="grid">
+    <a class="card" href="SeqShelf.html#map"><b>🗺 地図 (起点)</b><span>基底: 段階 × 画面 × クラス を 2 次元に置く。関数・変数は箱の中。値から値への線</span></a>
+    <a class="card" href="SeqShelf.html#list"><b>📚 図の一覧 (目次)</b><span>本棚の木と王道の目次。網・処理・R 図もここから</span></a>
+    <a class="card" href="SeqShelf.html#read"><b>📕 読む (通し)</b><span>L1 から L4 まで通しで読む</span></a>
+    <a class="card" href="SeqShelf.html#dashboard"><b>⚠ 問題</b><span>検査の指摘と工程の状態</span></a>
+    <a class="card" href="SeqShelf.html#tickets"><b>🎫 チケット</b><span>工程管理</span></a>
+    <a class="card" href="SeqShelf.html#concerns"><b>🛡 R 懸念</b><span>正常系の裏で起きうること</span></a>
+    <a class="card" href="SeqShelf.html#tests"><b>🧪 試験</b><span>試験項目と結果</span></a>
+    <a class="card" href="SeqShelf.html#manual"><b>📖 マニュアル</b><span>設計から起こす文案</span></a>
+  </div>
+  <p style="margin-top:24px">URL の末尾に <code>#map</code> のように付けると、その画面で開きます。図を直接開くには <code>#fig=図のid</code>。</p>
+</div>
+</body>
+</html>

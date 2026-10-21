@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>moviAI character</title>
+<style>
+  body { margin: 0; background: #0e0f13; color: #e6e8ee; font: 13px system-ui, sans-serif; }
+  .shot { position: relative; width: 1280px; height: 800px; }
+  .shot img { display: block; width: 1280px; height: 800px; }
+  .cls { position: absolute; box-sizing: border-box; border: 1px dashed rgba(79,156,249,.55); }
+  .cls::after { content: attr(data-cls); position: absolute; left: 0; top: -18px; padding: 1px 6px; background: #2f6fd0; color: #fff; font-size: 11px; border-radius: 3px; opacity: 0; }
+  .cls:hover { border-color: #4f9cf9; background: rgba(79,156,249,.12); }
+  .cls:hover::after { opacity: 1; }
+  .cls.cls-hilite { border: 3px solid #4f9cf9; background: rgba(79,156,249,.18); box-shadow: 0 0 0 6px rgba(79,156,249,.25); }
+  .cls.cls-hilite::after { opacity: 1; }
+  .btn { position: absolute; box-sizing: border-box; border: 1px solid transparent; border-radius: 4px; }
+  .btn:hover { border-color: rgba(79,156,249,.7); }
+  .btn.cls-hilite { border: 3px solid #f0b358; box-shadow: 0 0 0 6px rgba(240,179,88,.3); background: rgba(240,179,88,.15); }
+  .note { padding: 6px 10px; color: #8a90a0; }
+</style></head><body>
+<div class="shot"><img src="character.png" alt="moviAI character">
+<div class="cls" data-cls="CharacterView" style="left:0px;top:25px;width:1280px;height:775px" title="CharacterView"></div>
+<div class="cls" data-cls="CharacterCanvas" style="left:570px;top:81px;width:410px;height:654px" title="CharacterCanvas"></div>
+<div class="btn" data-btn="← ホーム" style="left:24px;top:37px;width:98px;height:38px" title="← ホーム"></div>
+<div class="btn" data-btn="パーツで作る" style="left:24px;top:81px;width:109px;height:26px" title="パーツで作る"></div>
+<div class="btn" data-btn="画像を使う" style="left:149px;top:81px;width:95px;height:26px" title="画像を使う"></div>
+<div class="btn" data-btn="部品パック" style="left:260px;top:82px;width:95px;height:24px" title="部品パック"></div>
+<div class="btn" data-btn="◀" style="left:88px;top:153px;width:40px;height:22px" title="◀"></div>
+<div class="btn" data-btn="▶" style="left:224px;top:153px;width:40px;height:22px" title="▶"></div>
+<div class="btn" data-btn="巫女風" style="left:34px;top:393px;width:80px;height:36px" title="巫女風"></div>
+<div class="btn" data-btn="魔法使い風" style="left:120px;top:393px;width:108px;height:36px" title="魔法使い風"></div>
+<div class="btn" data-btn="ねこ" style="left:234px;top:393px;width:66px;height:36px" title="ねこ"></div>
+<div class="btn" data-btn="メガネ" style="left:306px;top:393px;width:80px;height:36px" title="メガネ"></div>
+<div class="btn" data-btn="少年" style="left:392px;top:393px;width:66px;height:36px" title="少年"></div>
+<div class="btn" data-btn="学ラン" style="left:464px;top:392px;width:80px;height:38px" title="学ラン"></div>
+<div class="btn" data-btn="🎲 おまかせ" style="left:34px;top:349px;width:510px;height:37px" title="🎲 おまかせ"></div>
+<div class="btn" data-btn="✨ Claude に頼む" style="left:34px;top:512px;width:152px;height:38px" title="✨ Claude に頼む"></div>
+<div class="btn" data-btn="💬 しゃべらせる" style="left:702px;top:751px;width:145px;height:37px" title="💬 しゃべらせる"></div>
+<div class="btn" data-btn="保存" style="left:1005px;top:141px;width:118px;height:34px" title="保存"></div>
+<div class="btn" data-btn="新しく作る" style="left:1129px;top:140px;width:118px;height:36px" title="新しく作る"></div>
+<div class="btn" data-btn="▶ 聞く" style="left:1152px;top:276px;width:85px;height:36px" title="▶ 聞く"></div>
+<div class="btn" data-btn="選んだキャラを消す" style="left:1005px;top:721px;width:242px;height:36px" title="選んだキャラを消す"></div>
+</div>
+<div class="note">moviAI の実物の画面 (offscreen で撮影、1280×800)。点線の枠が本棚の UI のクラスの領域。</div>
+<script>
+// SeqShelf の地図 (S-40) からの問い合わせ: 親からの message だけに応じる
+window.addEventListener("message", (e) => {
+  if (window.parent === window || e.source !== window.parent) return;
+  const d = e.data;
+  if (!d || typeof d !== "object") return;
+  if (d.type === "seqshelf-probe") {
+    const matched = d.selectors.filter((x) => { try { return !!document.querySelector(x.selector); } catch { return false; } }).map((x) => x.id);
+    const cls = [...new Set([...document.querySelectorAll("[data-cls]")].map((x) => x.dataset.cls))];
+    e.source.postMessage({ type: "seqshelf-probe-result", matched, cls }, "*");
+  } else if (d.type === "seqshelf-highlight") {
+    for (const x of document.querySelectorAll(".cls-hilite")) x.classList.remove("cls-hilite");
+    if (d.selector) { try { for (const h of document.querySelectorAll(d.selector)) h.classList.add("cls-hilite"); } catch {} }
+  }
+});
+</script>
+</body></html>

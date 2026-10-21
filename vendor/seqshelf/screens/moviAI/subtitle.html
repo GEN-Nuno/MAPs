@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>moviAI subtitle</title>
+<style>
+  body { margin: 0; background: #0e0f13; color: #e6e8ee; font: 13px system-ui, sans-serif; }
+  .shot { position: relative; width: 1280px; height: 800px; }
+  .shot img { display: block; width: 1280px; height: 800px; }
+  .cls { position: absolute; box-sizing: border-box; border: 1px dashed rgba(79,156,249,.55); }
+  .cls::after { content: attr(data-cls); position: absolute; left: 0; top: -18px; padding: 1px 6px; background: #2f6fd0; color: #fff; font-size: 11px; border-radius: 3px; opacity: 0; }
+  .cls:hover { border-color: #4f9cf9; background: rgba(79,156,249,.12); }
+  .cls:hover::after { opacity: 1; }
+  .cls.cls-hilite { border: 3px solid #4f9cf9; background: rgba(79,156,249,.18); box-shadow: 0 0 0 6px rgba(79,156,249,.25); }
+  .cls.cls-hilite::after { opacity: 1; }
+  .btn { position: absolute; box-sizing: border-box; border: 1px solid transparent; border-radius: 4px; }
+  .btn:hover { border-color: rgba(79,156,249,.7); }
+  .btn.cls-hilite { border: 3px solid #f0b358; box-shadow: 0 0 0 6px rgba(240,179,88,.3); background: rgba(240,179,88,.15); }
+  .note { padding: 6px 10px; color: #8a90a0; }
+</style></head><body>
+<div class="shot"><img src="subtitle.png" alt="moviAI subtitle">
+<div class="cls" data-cls="EditWorkspace" style="left:0px;top:25px;width:1280px;height:775px" title="EditWorkspace"></div>
+<div class="btn" data-btn="← ホーム" style="left:4px;top:29px;width:76px;height:27px" title="← ホーム"></div>
+<div class="btn" data-btn="💾 保存" style="left:81px;top:29px;width:68px;height:26px" title="💾 保存"></div>
+<div class="btn" data-btn="編集" style="left:157px;top:30px;width:44px;height:25px" title="編集"></div>
+<div class="btn" data-btn="書き出し" style="left:202px;top:30px;width:72px;height:25px" title="書き出し"></div>
+<div class="btn" data-btn="パネル ▾" style="left:282px;top:30px;width:70px;height:25px" title="パネル ▾"></div>
+<div class="btn" data-btn="？ ガイド" style="left:360px;top:30px;width:76px;height:25px" title="？ ガイド"></div>
+<div class="btn" data-btn="エンジンを変更…" style="left:1098px;top:754px;width:146px;height:38px" title="エンジンを変更…"></div>
+<div class="btn" data-btn="✕" style="left:-531px;top:-742px;width:27px;height:26px" title="✕"></div>
+<div class="btn" data-btn="追加" style="left:-879px;top:-554px;width:86px;height:36px" title="追加"></div>
+<div class="btn" data-btn="削除" style="left:-787px;top:-554px;width:87px;height:36px" title="削除"></div>
+<div class="btn" data-btn="割当" style="left:-694px;top:-555px;width:86px;height:38px" title="割当"></div>
+<div class="btn" data-btn="声紋 ▾" style="left:-602px;top:-555px;width:92px;height:38px" title="声紋 ▾"></div>
+<div class="btn" data-btn="区間 ▾" style="left:1222px;top:631px;width:58px;height:27px" title="区間 ▾"></div>
+<div class="btn" data-btn="▶ この区間を再生" style="left:1068px;top:626px;width:148px;height:38px" title="▶ この区間を再生"></div>
+<div class="btn" data-btn="作る" style="left:-723px;top:-422px;width:64px;height:34px" title="作る"></div>
+<div class="btn" data-btn="読み込む…" style="left:-723px;top:-134px;width:108px;height:38px" title="読み込む…"></div>
+<div class="btn" data-btn="合わせる" style="left:-723px;top:47px;width:94px;height:36px" title="合わせる"></div>
+<div class="btn" data-btn="頼む" style="left:-723px;top:222px;width:66px;height:38px" title="頼む"></div>
+<div class="btn" data-btn="推定する" style="left:-723px;top:406px;width:94px;height:36px" title="推定する"></div>
+<div class="btn" data-btn="選ぶ" style="left:-723px;top:615px;width:66px;height:36px" title="選ぶ"></div>
+<div class="btn" data-btn="作る…" style="left:-723px;top:775px;width:80px;height:36px" title="作る…"></div>
+<div class="btn" data-btn="適用" style="left:-544px;top:-512px;width:66px;height:36px" title="適用"></div>
+<div class="btn" data-btn="現在の設定を保存" style="left:-432px;top:-512px;width:150px;height:36px" title="現在の設定を保存"></div>
+<div class="btn" data-btn="発言（字幕）のある所は残す" style="left:-609px;top:-288px;width:327px;height:26px" title="発言（字幕）のある所は残す"></div>
+<div class="btn" data-btn="編集後の長さを制限する" style="left:-730px;top:-212px;width:179px;height:24px" title="編集後の長さを制限する"></div>
+<div class="btn" data-btn="解析後に 字幕生成 → 見どころ選定 まで自動で実行する" style="left:-730px;top:-69px;width:379px;height:26px" title="解析後に 字幕生成 → 見どころ選定 まで自動で実行する"></div>
+<div class="btn" data-btn="この条件で再解析" style="left:-740px;top:-25px;width:468px;height:36px" title="この条件で再解析"></div>
+<div class="btn" data-btn="録音を読み込む…" style="left:-881px;top:-750px;width:150px;height:38px" title="録音を読み込む…"></div>
+<div class="btn" data-btn="字幕を作り直す" style="left:-725px;top:-749px;width:136px;height:36px" title="字幕を作り直す"></div>
+<div class="btn" data-btn="資材の音で聞く" style="left:-881px;top:-706px;width:373px;height:24px" title="資材の音で聞く"></div>
+<div class="btn" data-btn="⚠ 要確認" style="left:130px;top:124px;width:99px;height:38px" title="⚠ 要確認"></div>
+<div class="btn" data-btn="＋ 行" style="left:247px;top:125px;width:71px;height:36px" title="＋ 行"></div>
+<div class="btn" data-btn="− 行" style="left:324px;top:124px;width:65px;height:38px" title="− 行"></div>
+<div class="btn" data-btn="採用（書き出しに含める）" style="left:908px;top:173px;width:447px;height:24px" title="採用（書き出しに含める）"></div>
+<div class="btn" data-btn="強調（ズーム）" style="left:908px;top:201px;width:447px;height:26px" title="強調（ズーム）"></div>
+<div class="btn" data-btn="再生位置で分割" style="left:908px;top:231px;width:447px;height:36px" title="再生位置で分割"></div>
+<div class="btn" data-btn="次の区間と結合" style="left:908px;top:271px;width:447px;height:38px" title="次の区間と結合"></div>
+<div class="btn" data-btn="名前を表示" style="left:909px;top:385px;width:95px;height:24px" title="名前を表示"></div>
+<div class="btn" data-btn="話者ごとに色分け" style="left:1105px;top:385px;width:137px;height:24px" title="話者ごとに色分け"></div>
+<div class="btn" data-btn="背景ボックスで表示" style="left:909px;top:416px;width:445px;height:24px" title="背景ボックスで表示"></div>
+<div class="btn" data-btn="話者色" style="left:1074px;top:548px;width:80px;height:36px" title="話者色"></div>
+<div class="btn" data-btn="選択行に適用" style="left:1160px;top:547px;width:122px;height:38px" title="選択行に適用"></div>
+<div class="btn" data-btn="解除" style="left:1288px;top:548px;width:66px;height:36px" title="解除"></div>
+<div class="btn" data-btn="キャラを出す" style="left:909px;top:663px;width:445px;height:24px" title="キャラを出す"></div>
+<div class="btn" data-btn="表情を字幕に合わせる" style="left:909px;top:792px;width:445px;height:24px" title="表情を字幕に合わせる"></div>
+<div class="btn" data-btn="▶ 再生" style="left:395px;top:420px;width:85px;height:36px" title="▶ 再生"></div>
+<div class="btn" data-btn="消音" style="left:486px;top:420px;width:66px;height:36px" title="消音"></div>
+<div class="btn" data-btn="編集後プレビュー" style="left:692px;top:425px;width:137px;height:26px" title="編集後プレビュー"></div>
+<div class="btn" data-btn="字幕 ▾" style="left:835px;top:425px;width:58px;height:25px" title="字幕 ▾"></div>
+</div>
+<div class="note">moviAI の実物の画面 (offscreen で撮影、1280×800)。点線の枠が本棚の UI のクラスの領域。</div>
+<script>
+// SeqShelf の地図 (S-40) からの問い合わせ: 親からの message だけに応じる
+window.addEventListener("message", (e) => {
+  if (window.parent === window || e.source !== window.parent) return;
+  const d = e.data;
+  if (!d || typeof d !== "object") return;
+  if (d.type === "seqshelf-probe") {
+    const matched = d.selectors.filter((x) => { try { return !!document.querySelector(x.selector); } catch { return false; } }).map((x) => x.id);
+    const cls = [...new Set([...document.querySelectorAll("[data-cls]")].map((x) => x.dataset.cls))];
+    e.source.postMessage({ type: "seqshelf-probe-result", matched, cls }, "*");
+  } else if (d.type === "seqshelf-highlight") {
+    for (const x of document.querySelectorAll(".cls-hilite")) x.classList.remove("cls-hilite");
+    if (d.selector) { try { for (const h of document.querySelectorAll(d.selector)) h.classList.add("cls-hilite"); } catch {} }
+  }
+});
+</script>
+</body></html>

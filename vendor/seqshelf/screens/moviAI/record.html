@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>moviAI record</title>
+<style>
+  body { margin: 0; background: #0e0f13; color: #e6e8ee; font: 13px system-ui, sans-serif; }
+  .shot { position: relative; width: 906px; height: 449px; }
+  .shot img { display: block; width: 906px; height: 449px; }
+  .cls { position: absolute; box-sizing: border-box; border: 1px dashed rgba(79,156,249,.55); }
+  .cls::after { content: attr(data-cls); position: absolute; left: 0; top: -18px; padding: 1px 6px; background: #2f6fd0; color: #fff; font-size: 11px; border-radius: 3px; opacity: 0; }
+  .cls:hover { border-color: #4f9cf9; background: rgba(79,156,249,.12); }
+  .cls:hover::after { opacity: 1; }
+  .cls.cls-hilite { border: 3px solid #4f9cf9; background: rgba(79,156,249,.18); box-shadow: 0 0 0 6px rgba(79,156,249,.25); }
+  .cls.cls-hilite::after { opacity: 1; }
+  .btn { position: absolute; box-sizing: border-box; border: 1px solid transparent; border-radius: 4px; }
+  .btn:hover { border-color: rgba(79,156,249,.7); }
+  .btn.cls-hilite { border: 3px solid #f0b358; box-shadow: 0 0 0 6px rgba(240,179,88,.3); background: rgba(240,179,88,.15); }
+  .note { padding: 6px 10px; color: #8a90a0; }
+</style></head><body>
+<div class="shot"><img src="record.png" alt="moviAI record">
+<div class="cls" data-cls="RecordScreenDialog" style="left:0px;top:0px;width:906px;height:449px" title="RecordScreenDialog"></div>
+<div class="btn" data-btn="更新" style="left:829px;top:115px;width:66px;height:36px" title="更新"></div>
+<div class="btn" data-btn="＋ 音源" style="left:810px;top:157px;width:85px;height:36px" title="＋ 音源"></div>
+<div class="btn" data-btn="✕" style="left:868px;top:200px;width:27px;height:26px" title="✕"></div>
+<div class="btn" data-btn="参照…" style="left:819px;top:299px;width:76px;height:38px" title="参照…"></div>
+<div class="btn" data-btn="⏺ 開始" style="left:11px;top:403px;width:78px;height:34px" title="⏺ 開始"></div>
+<div class="btn" data-btn="閉じる" style="left:815px;top:402px;width:80px;height:36px" title="閉じる"></div>
+</div>
+<div class="note">moviAI の実物の画面 (offscreen で撮影、906×449)。点線の枠が本棚の UI のクラスの領域。</div>
+<script>
+// SeqShelf の地図 (S-40) からの問い合わせ: 親からの message だけに応じる
+window.addEventListener("message", (e) => {
+  if (window.parent === window || e.source !== window.parent) return;
+  const d = e.data;
+  if (!d || typeof d !== "object") return;
+  if (d.type === "seqshelf-probe") {
+    const matched = d.selectors.filter((x) => { try { return !!document.querySelector(x.selector); } catch { return false; } }).map((x) => x.id);
+    const cls = [...new Set([...document.querySelectorAll("[data-cls]")].map((x) => x.dataset.cls))];
+    e.source.postMessage({ type: "seqshelf-probe-result", matched, cls }, "*");
+  } else if (d.type === "seqshelf-highlight") {
+    for (const x of document.querySelectorAll(".cls-hilite")) x.classList.remove("cls-hilite");
+    if (d.selector) { try { for (const h of document.querySelectorAll(d.selector)) h.classList.add("cls-hilite"); } catch {} }
+  }
+});
+</script>
+</body></html>

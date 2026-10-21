@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MD Preview Editor</title>
+<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", "Yu Gothic UI", "游ゴシック", "Hiragino Sans", "Meiryo", sans-serif; height: 100vh; display: flex; flex-direction: column; }
+
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; background: #2b3a4a; color: #fff; flex-wrap: wrap;
+  }
+  header .title { font-weight: bold; margin-right: 12px; }
+  header .filename { font-size: 13px; color: #cfe0f0; margin-right: auto; }
+  .dirty-mark { color: #ffd76e; }
+
+  button {
+    padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer;
+    background: #4a6a8a; color: #fff; font-size: 13px;
+  }
+  button:hover { background: #5b7fa5; }
+  button.active { background: #e8833a; }
+  button.primary { background: #2e8b57; }
+  button.primary:hover { background: #37a468; }
+  @keyframes savePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(232,131,58,.6); }
+    50% { box-shadow: 0 0 0 6px rgba(232,131,58,0); }
+  }
+  #btnSave.attention { background: #e8833a; animation: savePulse 1.6s infinite; }
+  button.ghost { background: transparent; border: 1px solid #8fa5ba; }
+  button:disabled { opacity: .4; cursor: default; }
+  select, input[type=text] { padding: 6px; border-radius: 4px; border: 1px solid #bbb; font-size: 13px; }
+
+  .layout { flex: 1; display: flex; min-height: 0; }
+
+  aside {
+    width: 230px; background: #f4f6f8; border-right: 1px solid #ddd;
+    overflow-y: auto; padding: 8px; flex-shrink: 0;
+  }
+  aside h3 { font-size: 12px; color: #667; margin: 4px 0 8px; }
+  #searchBox { width: 100%; margin-bottom: 8px; font-size: 12px; }
+  .dir-head { font-size: 11px; color: #667; font-weight: bold; margin: 10px 0 2px; }
+  .hit-line { color: #778; font-size: 11px; display: block; }
+
+  /* 印刷/PDF出力: 表示中の本文だけを印刷する */
+  @media print {
+    header, aside, .subbar, #toast, #startScreen, #mermaidOverlayLayer, .overlay { display: none !important; }
+    .layout, main { display: block !important; }
+    .pane { display: none !important; }
+    .pane.visible { display: block !important; overflow: visible !important; }
+    #viewerContent, #diffContent { max-width: none; padding: 0; }
+  }
+  .file-item {
+    padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .file-item .fname { flex: 1; word-break: break-all; }
+  .file-item .fact { display: none; flex-shrink: 0; gap: 2px; }
+  .file-item:hover .fact { display: inline-flex; }
+  .fact button { padding: 1px 6px; font-size: 11px; background: #aab6c2; }
+  .fact button:hover { background: #8a99a8; }
+  .file-item:hover { background: #e2e8ee; }
+  .file-item.selected { background: #cfe0f0; font-weight: bold; }
+  aside .small-btn { width: 100%; margin-top: 8px; background: #8899aa; }
+
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+  .pane { flex: 1; min-height: 0; overflow-y: auto; display: none; }
+  .pane.visible { display: block; }
+  #editorPane.visible { display: flex; flex-direction: column; }
+  #editorPane { position: relative; }
+  #editor { flex: 1; min-height: 0; }
+
+  /* 編集モード内のMermaidライブプレビュー(コードブロックに重ねて表示) */
+  /* ProseMirrorはpreへのinlineスタイルを打ち消すため、図の場所はスタイルシート規則で確保する。
+     これで図カードの下に本文が潜り込んで重なるのを構造的に防ぐ。 */
+  #editor .ProseMirror pre:has(code[data-language="mermaid"]) { min-height: 300px; }
+  #mermaidOverlayLayer { position: absolute; inset: 0; pointer-events: none; z-index: 20; overflow: hidden; }
+  .mm-inline {
+    position: absolute; background: #fff; border: 1px solid #cdd6e0; border-radius: 6px;
+    overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .mm-inline .mm-inline-svg {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; pointer-events: auto; background: #fff; padding: 6px;
+  }
+  .mm-inline svg { max-width: 100%; max-height: 100%; }
+  .mm-inline-edit {
+    position: absolute; top: 4px; right: 4px; pointer-events: auto;
+    background: #4a6a8a; font-size: 12px; padding: 3px 10px;
+  }
+  .mm-inline.invalid { background: transparent; border: 1px dashed #e8833a; box-shadow: none; }
+  .mm-inline-tools, .img-tools {
+    position: absolute; top: 4px; right: 4px; display: flex; gap: 4px; pointer-events: none;
+  }
+  .img-tools { justify-content: flex-end; }
+  .mm-inline-tools button, .img-tools button {
+    pointer-events: auto; font-size: 12px; padding: 3px 8px;
+    background: #4a6a8a; box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  }
+  .mm-inline-tools button:first-child, .img-tools button:first-child { background: #e8833a; }
+  .mm-inline-tools button:hover, .img-tools button:hover { filter: brightness(1.15); }
+
+  /* 画像のドラッグ移動は複製など誤操作になりやすいので無効化(移動は⬆⬇ボタンで行う) */
+  #editor .ProseMirror img { -webkit-user-drag: none; user-drag: none; }
+
+  /* 表の中にカーソルがあるとき、表の真上に出る編集ツールバー */
+  #tableTools {
+    position: absolute; z-index: 25; display: none; gap: 4px; align-items: center;
+    flex-wrap: nowrap; white-space: nowrap; width: max-content; pointer-events: none;
+    background: #eef1f4; border: 1px solid #d5dde5; border-radius: 6px; padding: 3px 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.12);
+  }
+  #tableTools button {
+    pointer-events: auto; font-size: 12px; padding: 3px 8px;
+    background: #4a6a8a; box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  }
+  #tableTools button:hover { filter: brightness(1.15); }
+  #tableTools button.danger { background: #a55; }
+  #tableTools .sep { width: 1px; height: 18px; background: #b8c4d0; pointer-events: none; }
+  .toastui-editor-defaultUI { border-radius: 0; border: none; height: 100% !important; }
+
+  /* エディタ本文はToast UI既定が欧文フォントのため、日本語が綺麗に出るスタックへ上書きする */
+  .toastui-editor-contents {
+    font-family: "Segoe UI", "Yu Gothic UI", "游ゴシック", "Hiragino Sans", "Meiryo", sans-serif;
+    font-size: 15px;
+    color: #223;
+  }
+  .toastui-editor-contents code,
+  .toastui-editor-contents pre,
+  .toastui-editor-contents pre code {
+    font-family: Consolas, "BIZ UDゴシック", "MS Gothic", monospace;
+  }
+
+  #viewerPane, #diffPane { padding: 0 0 24px; }
+  #viewerContent, #diffContent { padding: 24px 36px; max-width: 980px; }
+
+  .subbar {
+    display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+    background: #eef1f4; border-bottom: 1px solid #ddd; font-size: 13px;
+    position: sticky; top: 0; z-index: 5;
+  }
+  .subbar .hint { color: #778; margin-left: auto; font-size: 12px; }
+
+  /* 差分表示: 追加・変更は赤、削除は取り消し線 */
+  #diffContent ins { color: #d61c1c; background: #ffecec; text-decoration: none; }
+  #diffContent del { color: #999; text-decoration: line-through; background: #f2f2f2; }
+  #diffContent img.diffins { outline: 3px solid #d61c1c; }
+  #diffContent img.diffdel { outline: 3px solid #bbb; opacity: .5; }
+
+  .md-body h1 { border-bottom: 2px solid #e2e8ee; padding-bottom: 6px; }
+  .md-body h2 { border-bottom: 1px solid #e2e8ee; padding-bottom: 4px; }
+  .md-body table { border-collapse: collapse; }
+  .md-body th, .md-body td { border: 1px solid #ccc; padding: 6px 10px; }
+  .md-body th { background: #f4f6f8; }
+  .md-body pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  .md-body code { background: #f0f2f4; padding: 1px 5px; border-radius: 3px; font-size: .9em; }
+  .md-body pre code { background: none; padding: 0; }
+  .md-body blockquote { border-left: 4px solid #cfd8e0; margin-left: 0; padding-left: 14px; color: #556; }
+  .md-body img { max-width: 100%; }
+
+  /* ---- スタート画面(ファイル未選択時) ---- */
+  #startScreen {
+    position: absolute; inset: 0; background: #fbfcfd; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  }
+  #startScreen h2 { color: #445; margin: 0 0 4px; }
+  #startScreen p { color: #667; margin: 0; font-size: 14px; text-align: center; line-height: 1.8; }
+  #startScreen .big { font-size: 15px; padding: 12px 28px; }
+
+  /* ---- モーダル共通 ---- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100;
+    display: none; align-items: center; justify-content: center;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 10px; width: min(1100px, 94vw); max-height: 92vh;
+    display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.3);
+  }
+  .modal-head {
+    display: flex; align-items: center; gap: 6px; padding: 10px 16px;
+    background: #2b3a4a; color: #fff;
+  }
+  .modal-head .sp { margin-left: auto; }
+  .modal-body { flex: 1; min-height: 0; overflow-y: auto; }
+  .modal-foot { padding: 10px 16px; border-top: 1px solid #ddd; display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* ---- 図作成モーダル ---- */
+  .tabbtn { background: transparent; border: 1px solid transparent; color: #cdd; }
+  .tabbtn.active { background: #e8833a; color: #fff; }
+  #diagramModal .modal { width: min(1400px, 97vw); }
+  #diagramMermaid { display: flex; gap: 0; height: 76vh; }
+  .mm-left { width: 44%; display: flex; flex-direction: column; border-right: 1px solid #ddd; }
+  .mm-left .row { display: flex; gap: 8px; padding: 10px; align-items: center; flex-wrap: wrap; background: #f4f6f8; border-bottom: 1px solid #ddd; }
+  .mm-left textarea {
+    flex: 1; border: none; resize: none; padding: 12px; font-size: 14px; line-height: 1.7;
+    font-family: Consolas, "MS Gothic", monospace; outline: none;
+  }
+  .mm-right { flex: 1; overflow: auto; padding: 16px; background: #fdfdfd; }
+  .mm-right .err { color: #c00; font-size: 12px; white-space: pre-wrap; }
+  .mm-help {
+    font-size: 12px; color: #556; background: #f8f4e8; padding: 8px 12px;
+    border-top: 1px solid #e8dfc0; line-height: 1.9;
+  }
+  .mm-help code { background: #fff; border: 1px solid #ddd; border-radius: 3px; padding: 0 4px; }
+  #drawioFrame { width: 100%; height: 74vh; border: none; display: block; }
+
+  /* ---- 使い方モーダル ---- */
+  #helpModal .modal { width: min(760px, 94vw); }
+  .help-body { padding: 20px 28px; line-height: 1.9; font-size: 14px; color: #334; }
+  .help-body h3 { margin: 18px 0 6px; color: #2b3a4a; border-left: 4px solid #e8833a; padding-left: 8px; }
+  .help-body .step { background: #f4f6f8; border-radius: 6px; padding: 10px 14px; margin: 8px 0; }
+  .help-body .step b { color: #2b3a4a; }
+  .help-body kbd { background: #eee; border: 1px solid #ccc; border-radius: 3px; padding: 0 6px; font-size: 12px; }
+  .btn-sample { background:#4a6a8a; color:#fff; border-radius:4px; padding:2px 10px; font-size:12px; display:inline-block; }
+  .btn-sample.orange { background:#e8833a; }
+  .btn-sample.green { background:#2e8b57; }
+
+  #toast {
+    position: fixed; bottom: 20px; right: 20px; background: #333; color: #fff;
+    padding: 10px 18px; border-radius: 6px; font-size: 13px; opacity: 0;
+    transition: opacity .3s; pointer-events: none; z-index: 999;
+  }
+  #toast.show { opacity: .92; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">📄 MD Preview Editor</span>
+  <span class="filename" id="currentFile">ファイル未選択</span>
+  <button id="btnEdit" class="active" title="文書を書き換えるモード。見たまま編集できます">✏️ 編集モード</button>
+  <button id="btnView" title="読むためのモード。図の表示や、過去バージョンとの差分確認ができます">👁 閲覧モード</button>
+  <button id="btnSave" class="primary" title="ファイルに保存します (Ctrl+S)">💾 保存</button>
+  <button id="btnSnapshot" title="現在の内容を「過去バージョン」として記録します。後で差分を見るときの比較元になります">📌 バージョン保存</button>
+  <button id="btnFeedback" class="ghost" title="使いにくい点や欲しい機能をメモしておけます（feedback.mdに記録）">💬 改善要望</button>
+  <button id="btnHelp" class="ghost" title="使い方の説明を表示します">❓ 使い方</button>
+</header>
+
+<div class="layout">
+  <aside>
+    <h3>Markdownファイル</h3>
+    <input type="text" id="searchBox" placeholder="🔎 検索（ファイル名・本文）">
+    <div id="fileList"></div>
+    <button class="small-btn" id="btnNewFile">＋ 新規ファイル</button>
+    <button class="small-btn" id="btnReload">🔄 一覧を更新</button>
+  </aside>
+
+  <main>
+    <!-- ファイル未選択時のスタート画面 -->
+    <div id="startScreen">
+      <h2>ようこそ 👋</h2>
+      <p>ここは Markdown 文書を「見たまま」編集できるツールです。<br>
+         左のファイル一覧から開くか、新しいファイルを作って始めましょう。</p>
+      <button class="big primary" id="btnStartNew">＋ 新しい文書を作る</button>
+      <button class="big" id="btnStartHelp">❓ 使い方を見る</button>
+    </div>
+
+    <!-- 編集モード: WYSIWYG -->
+    <div class="pane visible" id="editorPane">
+      <div id="editor"></div>
+      <div id="mermaidOverlayLayer"></div>
+      <div id="tableTools">
+        <button data-cmd="addRowToUp" title="いまカーソルがある行の上に、行を追加します">行↑＋</button>
+        <button data-cmd="addRowToDown" title="いまカーソルがある行の下に、行を追加します">行↓＋</button>
+        <button data-cmd="removeRow" class="danger" title="いまカーソルがある行を削除します">行－</button>
+        <span class="sep"></span>
+        <button data-cmd="addColumnToLeft" title="いまカーソルがある列の左に、列を追加します">列←＋</button>
+        <button data-cmd="addColumnToRight" title="いまカーソルがある列の右に、列を追加します">列→＋</button>
+        <button data-cmd="removeColumn" class="danger" title="いまカーソルがある列を削除します">列－</button>
+        <span class="sep"></span>
+        <button data-cmd="removeTable" class="danger" title="この表ごと削除します">表を削除</button>
+      </div>
+    </div>
+
+    <!-- 閲覧モード: 通常 -->
+    <div class="pane" id="viewerPane">
+      <div class="md-body" id="viewerContent"></div>
+    </div>
+
+    <!-- 閲覧モード: 差分 -->
+    <div class="pane" id="diffPane">
+      <div class="md-body" id="diffContent"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ================= 図の挿入モーダル ================= -->
+<div class="overlay" id="diagramModal">
+  <div class="modal">
+    <div class="modal-head">
+      <span>🎨 図を挿入</span>
+      <button class="tabbtn active" id="tabMermaid">かんたん作成（テンプレート）</button>
+      <button class="tabbtn" id="tabDrawio">マウスで描く（draw.io）</button>
+      <span class="sp"></span>
+      <button class="ghost" id="btnDiagramClose">✕ 閉じる</button>
+    </div>
+    <div class="modal-body">
+      <!-- Mermaidタブ -->
+      <div id="diagramMermaid">
+        <div class="mm-left">
+          <div class="row">
+            <label>ひな形:</label>
+            <select id="mmTemplate">
+              <option value="flow">フロー図（手順・分岐）</option>
+              <option value="sequence">シーケンス図（やりとり）</option>
+              <option value="gantt">ガントチャート（日程）</option>
+              <option value="pie">円グラフ（割合）</option>
+              <option value="state">状態遷移図</option>
+            </select>
+            <button id="mmApplyTemplate">このひな形を使う</button>
+            <select id="mmTarget" title="文書内の既存の図を選ぶと、その図を書き換えられます">
+              <option value="new">▼ 挿入先: 新しい図として追加</option>
+            </select>
+          </div>
+          <textarea id="mmCode" spellcheck="false" placeholder="ここに図の内容を書くと、右にプレビューが表示されます。&#10;まずは上の「ひな形」から選んで試してみてください。"></textarea>
+          <div class="mm-help" id="mmHelp"></div>
+        </div>
+        <div class="mm-right" id="mmPreview">
+          <p style="color:#889">左で「ひな形を使う」を押すと、ここに図が表示されます。<br>文字を書き換えると図もすぐ変わります。</p>
+        </div>
+      </div>
+      <!-- draw.ioタブ -->
+      <div id="diagramDrawio" style="display:none">
+        <iframe id="drawioFrame"></iframe>
+      </div>
+    </div>
+    <div class="modal-foot" id="mermaidFoot">
+      <span style="margin-right:auto; color:#778; font-size:12px">プレビューがエラーのままでも挿入はできますが、閲覧モードで図になりません</span>
+      <button class="ghost" style="color:#445; border-color:#aaa" id="btnDiagramCancel">キャンセル</button>
+      <button class="primary" id="btnDiagramInsert">✅ この図を文書に入れる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 使い方モーダル ================= -->
+<div class="overlay" id="helpModal">
+  <div class="modal">
+    <div class="modal-head">
+      <span>❓ 使い方</span>
+      <span class="sp"></span>
+      <button class="ghost" id="btnHelpClose">✕ 閉じる</button>
+    </div>
+    <div class="modal-body help-body">
+      <h3>基本の流れ</h3>
+      <div class="step"><b>1. ファイルを開く／作る</b><br>
+        左の一覧から選ぶか、「＋ 新規ファイル」で作ります。
+        一覧のファイル名にマウスを乗せると <b>✎（名前変更）</b> と <b>🗑（削除）</b> が出ます。</div>
+      <div class="step"><b>2. そのまま書く</b><br>
+        <span class="btn-sample">✏️ 編集モード</span> では、Wordのように「見たまま」書けます。
+        太字・見出し・表などは上のツールバーから。Markdownの記法を覚える必要はありません。</div>
+      <div class="step"><b>表を直したいとき</b>は、表の中のどこかをクリックしてください。
+        表の真上に <b>行↑＋ 行↓＋ 行－ ／ 列←＋ 列→＋ 列－ ／ 表を削除</b> のボタンが出ます。
+        いまカーソルがある行・列を基準に追加・削除されます。</div>
+      <div class="step"><b>3. 保存する</b><br>
+        <span class="btn-sample green">💾 保存</span> か <kbd>Ctrl</kbd>+<kbd>S</kbd>。
+        書きかけの内容は保存するまでファイルに反映されません。</div>
+
+      <h3>図を入れたい</h3>
+      <div class="step">編集モードのツールバー右端の <b>🎨（図を挿入）</b> を押します。<br>
+        ・<b>かんたん作成</b> … フロー図や日程表などのひな形を選び、文字を書き換えるだけ。右に図のプレビューが出ます。<br>
+        ・<b>マウスで描く（draw.io）</b> … 本格的な作図ツールで自由に描き、「保存」を押すとそのまま文書に画像として入ります。</div>
+      <div class="step">入れた図は編集モードでもそのまま図として表示されます。<br>
+        ・かんたん作成の図 … <b>図をクリック</b>するとプレビューを見ながら書き換えられます<br>
+        ・draw.ioの図 … 図の右上の <b>「✏️ draw.ioで編集」</b> か <b>図のダブルクリック</b>で、描いた続きから編集し直せます<br>
+        ・画像の貼り付け（スクショ等）もOK。自動で assets/ に保存されます<br>
+        ・図の右上の <b>⬆ ⬇</b> で図を上下に移動、<b>🗑</b> で削除できます（ドラッグでの移動は誤操作しやすいため無効にしています）</div>
+      <div class="step"><b>Mermaidの図をマウスで編集したくなったら</b>、図の右上の <b>「🎨 draw.io化」</b> を押します。
+        Mermaidの図がdraw.ioの図形に変換され、以後はマウスで自由に編集できます。<br>
+        ※ 変換は一方向です（draw.io図になると、Mermaidの文字としては編集できなくなります）。フロー図（graph／flowchart）が対象です。</div>
+
+      <h3>そのほか便利な機能</h3>
+      <div class="step">・<b>🔎 検索</b> … 左上の検索欄に入力すると、ファイル名と本文を横断検索できます<br>
+        ・<b>💾 HTML保存</b> … 閲覧モードのボタンから、文書を図入りのまま単体HTMLとして保存できます（共有用）<br>
+        ・<b>🖨 印刷 / PDF</b> … 閲覧モードのボタンから、表示中の内容（差分含む）を印刷やPDF保存できます<br>
+        ・<b>下書きの自動退避</b> … 保存し忘れてブラウザを閉じても、次にそのファイルを開いたときに復元を提案します</div>
+
+      <h3>気づいたことをメモしたい</h3>
+      <div class="step"><span class="btn-sample">💬 改善要望</span> ボタンから、使いにくい点や欲しい機能をいつでも書き残せます。
+        書いた内容は日時付きで <b>feedback.md</b> に記録され、左のファイル一覧から見返せます。</div>
+
+      <h3>過去バージョンとの比較（差分）</h3>
+      <div class="step"><b>1.</b> 区切りのよいタイミングで <span class="btn-sample">📌 バージョン保存</span> を押して記録しておく<br>
+        <b>2.</b> その後、文書を修正する<br>
+        <b>3.</b> <span class="btn-sample">👁 閲覧モード</span> → <span class="btn-sample orange">差分表示</span> で比較元バージョンを選ぶ<br>
+        → <span style="color:#d61c1c">追加・変更した箇所は赤</span>、<del style="color:#999">削除した箇所は取り消し線</del> で表示されます。
+        改行を増やしただけのような見た目に影響しない変更は表示されません。</div>
+      <div class="step"><b>手元にある別のmdファイル（旧版など）と比べたいとき</b>は、差分表示中の <span class="btn-sample">📥 比較用mdを取り込む</span> でそのファイルを選ぶと、すぐに差分が表示されます。</div>
+      <div class="step"><b>差分を残したい・共有したいとき</b>は、差分表示中の <span class="btn-sample green">💾 この差分を保存</span> を押すと、
+        赤入りのまま単体で開けるHTMLファイルとして保存されます（メール添付や共有フォルダ経由で他の人にもそのまま見せられます）。</div>
+      <div class="step"><b>昔の内容に戻したいとき</b>は、差分表示中の <span class="btn-sample">↩ このバージョンに戻す</span> を押します。
+        戻す前の内容も自動でバックアップされるので、安心して戻せます。</div>
+    </div>
+    <div class="modal-foot">
+      <button class="primary" id="btnHelpOk">わかった！</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 改善要望モーダル ================= -->
+<div class="overlay" id="feedbackModal">
+  <div class="modal" style="width:min(640px,94vw)">
+    <div class="modal-head">
+      <span>💬 改善要望・メモ</span>
+      <span class="sp"></span>
+      <button class="ghost" id="btnFeedbackClose">✕ 閉じる</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px">
+      <p style="margin:0 0 12px; color:#556; font-size:13px; line-height:1.8">
+        使いにくかったこと・欲しい機能・気づいたことを、思いついたときに何でも書いてください。<br>
+        書いた内容は <b>feedback.md</b> に日時付きで追記され、左のファイル一覧からいつでも見返せます。
+      </p>
+      <div style="margin-bottom:10px">
+        <label style="font-size:13px; color:#445">種類: </label>
+        <select id="fbCategory">
+          <option>💡 改善要望</option>
+          <option>🐛 不具合</option>
+          <option>📝 メモ</option>
+        </select>
+      </div>
+      <textarea id="fbText" spellcheck="false"
+        style="width:100%; height:200px; padding:12px; font-size:14px; line-height:1.7; border:1px solid #bbb; border-radius:6px; resize:vertical"
+        placeholder="例:&#10;・図の編集画面をもっと大きくしたい&#10;・保存したときの通知が小さくて気づかない&#10;・○○の画面で△△したら□□になって困った（不具合のときは操作手順を書いておくと後で助かります）"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="ghost" style="color:#445; border-color:#aaa" id="btnFeedbackCancel">キャンセル</button>
+      <button class="primary" id="btnFeedbackSubmit">✅ 記録する</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importVersionInput" accept=".md,.txt,.markdown" style="display:none">
+
+<div id="toast"></div>
+
+<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script>
+mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+
+const state = {
+  file: null,
+  mode: 'edit',
+  viewSub: 'normal',
+  dirty: false,
+  versions: [],
+  diffVersionId: null,
+};
+
+const $ = (id) => document.getElementById(id);
+
+// ---------- Toast UI Editor (WYSIWYG) ----------
+const editor = new toastui.Editor({
+  el: $('editor'),
+  height: '100%',
+  initialEditType: 'wysiwyg',
+  hideModeSwitch: true,
+  usageStatistics: false,
+  language: 'ja',
+  initialValue: '',
+  toolbarItems: [
+    ['heading', 'bold', 'italic', 'strike'],
+    ['hr', 'quote'],
+    ['ul', 'ol', 'task'],
+    ['table', 'image', 'link'],
+    [{
+      name: 'diagram',
+      tooltip: '図を挿入（フロー図・日程表・draw.io作図）',
+      el: (() => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = '🎨';
+        b.style.cssText = 'background:none;font-size:18px;padding:0 4px;margin:0;color:#333;';
+        b.onclick = () => openDiagramModal();
+        return b;
+      })(),
+    }],
+  ],
+  events: {
+    change: () => {
+      if (state.file) setDirty(true);
+      scheduleEditorDiagrams();
+      scheduleDraftBackup();
+    },
+  },
+  hooks: {
+    // 画像の貼り付け・ドロップ・ツールバー挿入時: 文書に埋め込まず assets/ にファイル保存して参照する
+    addImageBlobHook: async (blob, callback) => {
+      try {
+        const dataUri = await new Promise((r) => {
+          const fr = new FileReader();
+          fr.onload = () => r(fr.result);
+          fr.readAsDataURL(blob);
+        });
+        const base = (blob.name || 'image').replace(/\.\w+$/, '');
+        const { path } = await api('/api/asset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: base, dataUri }),
+        });
+        callback(path, '画像');
+        toast('🖼 画像を assets/ に保存して挿入しました');
+      } catch (e) {
+        toast('画像の保存に失敗しました: ' + e.message);
+      }
+    },
+  },
+});
+
+// ---------- ユーティリティ ----------
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function setDirty(d) {
+  state.dirty = d;
+  renderHeader();
+}
+
+function renderHeader() {
+  $('currentFile').innerHTML = state.file
+    ? `${state.file} ${state.dirty ? '<span class="dirty-mark">●未保存</span>' : ''}`
+    : 'ファイル未選択';
+  $('startScreen').style.display = state.file ? 'none' : 'flex';
+  $('btnSave').classList.toggle('attention', state.dirty);  // 未保存のときは保存ボタンを目立たせる
+}
+
+// ---------- ファイル一覧 ----------
+function makeFileItem(f, displayName, hitsHtml) {
+  const div = document.createElement('div');
+  div.className = 'file-item' + (f === state.file ? ' selected' : '');
+  const name = document.createElement('span');
+  name.className = 'fname';
+  name.textContent = displayName || f;
+  if (hitsHtml) {
+    const small = document.createElement('span');
+    small.className = 'hit-line';
+    small.innerHTML = hitsHtml;
+    name.appendChild(small);
+  }
+  const act = document.createElement('span');
+  act.className = 'fact';
+  const bRen = document.createElement('button');
+  bRen.textContent = '✎';
+  bRen.title = '名前を変更';
+  bRen.onclick = (e) => { e.stopPropagation(); renameFile(f); };
+  const bDel = document.createElement('button');
+  bDel.textContent = '🗑';
+  bDel.title = '削除';
+  bDel.onclick = (e) => { e.stopPropagation(); deleteFile(f); };
+  act.append(bRen, bDel);
+  div.append(name, act);
+  div.onclick = () => openFile(f);
+  return div;
+}
+
+async function loadFiles() {
+  const { files } = await api('/api/files');
+  if ($('searchBox').value.trim()) return files;  // 検索中は検索結果の表示を維持する
+  const list = $('fileList');
+  list.innerHTML = '';
+  if (!files.length) list.innerHTML = '<div style="padding:8px;color:#889;font-size:12px">.mdファイルがありません</div>';
+  // フォルダごとに見出しを付けて表示する
+  const groups = {};
+  for (const f of files) {
+    const dir = f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '';
+    (groups[dir] = groups[dir] || []).push(f);
+  }
+  for (const dir of Object.keys(groups).sort()) {
+    if (dir) {
+      const h = document.createElement('div');
+      h.className = 'dir-head';
+      h.textContent = '📁 ' + dir;
+      list.appendChild(h);
+    }
+    for (const f of groups[dir]) {
+      list.appendChild(makeFileItem(f, dir ? f.slice(dir.length + 1) : f));
+    }
+  }
+  return files;
+}
+
+// ---------- 検索 ----------
+let searchTimer = null;
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function runSearch() {
+  const q = $('searchBox').value.trim();
+  if (!q) { await loadFiles(); return; }
+  const { results } = await api('/api/search?q=' + encodeURIComponent(q));
+  const list = $('fileList');
+  list.innerHTML = '';
+  if (!results.length) {
+    list.innerHTML = '<div style="padding:8px;color:#889;font-size:12px">見つかりませんでした</div>';
+    return;
+  }
+  for (const r of results) {
+    const hits = r.hits.map((h) => escHtml(h.text)).join('<br>');
+    list.appendChild(makeFileItem(r.file, r.file, hits));
+  }
+}
+
+async function renameFile(f) {
+  const to = prompt('新しいファイル名:', f);
+  if (!to || to === f) return;
+  const rel = to.endsWith('.md') ? to : to + '.md';
+  try {
+    await api('/api/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: f, to: rel }),
+    });
+  } catch (e) {
+    return toast('変更できませんでした: ' + e.message);
+  }
+  if (state.file === f) { state.file = rel; renderHeader(); await loadVersions(); }
+  await loadFiles();
+  toast('✎ 名前を変更しました');
+}
+
+async function deleteFile(f) {
+  if (!confirm(`「${f}」を削除します。よろしいですか？\n（保存済みバージョンは残るので、必要になったら復元を相談できます）`)) return;
+  try {
+    await api('/api/file?path=' + encodeURIComponent(f), { method: 'DELETE' });
+  } catch (e) {
+    return toast('削除できませんでした: ' + e.message);
+  }
+  if (state.file === f) {
+    state.file = null;
+    editor.setMarkdown('', false);
+    setDirty(false);
+    renderHeader();
+  }
+  await loadFiles();
+  toast('🗑 削除しました');
+}
+
+async function openFile(rel) {
+  if (state.dirty && !confirm('未保存の変更があります。破棄して開きますか？')) return;
+  let content, mtime;
+  try {
+    ({ content, mtime } = await api('/api/file?path=' + encodeURIComponent(rel)));
+  } catch (e) {
+    toast('⚠ 開けませんでした: ' + e.message);
+    await loadFiles();
+    return;
+  }
+  state.file = rel;
+  state.fileMtime = mtime;
+  editor.setMarkdown(content, false);
+  setDirty(false);
+  // 前回保存されずに終了した下書きが残っていれば復元を提案する
+  const draftRaw = localStorage.getItem(DRAFT_KEY);
+  if (draftRaw) {
+    try {
+      const d = JSON.parse(draftRaw);
+      if (d.file === rel && d.content !== content) {
+        if (confirm('このファイルには、前回保存されないまま終了した編集内容が残っています。復元しますか？\n（キャンセルすると破棄されます）')) {
+          editor.setMarkdown(d.content, false);
+          setDirty(true);
+          toast('📝 未保存だった内容を復元しました。💾 保存で確定します');
+        } else {
+          localStorage.removeItem(DRAFT_KEY);
+        }
+      } else if (d.file === rel) {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch { localStorage.removeItem(DRAFT_KEY); }
+  }
+  clearEditorHistory();  // 読み込んだ内容より前へアンドゥで戻れないようにする(文書全体が消えるのを防ぐ)
+  await loadVersions();
+  await loadFiles();
+  refreshPane();
+}
+
+// ファイル読込直後にアンドゥ履歴を空にする。
+// これをしないと、読込(setMarkdown)もアンドゥ対象になり、編集を超えてCtrl+Zすると
+// 文書全体が消え、高さが無くなって画面が最上部に飛ぶ。
+function clearEditorHistory() {
+  try {
+    const ww = editor.getCurrentModeEditor && editor.getCurrentModeEditor();
+    if (!ww || !ww.view) return;
+    const view = ww.view;
+    const EditorState = view.state.constructor;  // 同じ内容・プラグインで作り直すと履歴だけが空になる
+    view.updateState(EditorState.create({
+      doc: view.state.doc,
+      plugins: view.state.plugins,
+      selection: view.state.selection,
+    }));
+  } catch { /* 履歴クリアに失敗しても編集は継続できる */ }
+}
+
+// ---------- 下書きの自動退避(クラッシュ・保存忘れ対策) ----------
+const DRAFT_KEY = 'mdpreview-draft';
+let draftTimer = null;
+function scheduleDraftBackup() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    if (state.file && state.dirty) {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ file: state.file, content: editor.getMarkdown(), time: Date.now() }));
+      } catch { /* 容量超過などで退避できなくても編集を妨げない(保存自体は通常どおり可能) */ }
+    }
+  }, 1500);
+}
+
+// ---------- 保存 ----------
+let savingNow = false;  // Ctrl+S連打などで保存が並走すると自分自身と競合誤検知するため直列化する
+async function saveFile(opts = {}) {
+  if (!state.file) return toast('先にファイルを開いてください');
+  if (savingNow && !opts.force) return;
+  savingNow = true;
+  try {
+    const res = await fetch('/api/file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: state.file,
+        content: editor.getMarkdown(),
+        baseMtime: state.fileMtime,
+        force: !!opts.force,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409) {
+      // 他のタブや外部エディタで同じファイルが変更されている
+      if (confirm('このファイルは別の場所(他のタブ・外部エディタ等)で変更されています。\nこのまま上書き保存しますか？\n(キャンセルすると保存されません。心配な場合は先に相手側の内容を確認してください)')) {
+        return saveFile({ force: true });
+      }
+      toast('保存を中止しました(未保存のままです)');
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    state.fileMtime = data.mtime;
+    setDirty(false);
+    localStorage.removeItem(DRAFT_KEY);  // 保存できたので退避下書きは不要
+    toast('💾 保存しました');
+  } catch (e) {
+    toast('⚠ 保存できませんでした: ' + e.message + '(内容は画面に残っています)');
+  } finally {
+    savingNow = false;
+  }
+}
+
+async function saveSnapshot() {
+  if (!state.file) return toast('先にファイルを開いてください');
+  const label = prompt('このバージョンに名前を付けられます（例: レビュー前）。\n空欄でもOKです。', '');
+  if (label === null) return;
+  try {
+    await saveFile();
+    if (state.dirty) return;  // 保存が中止/失敗した場合はスナップショットも取らない
+    await api('/api/version', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: state.file, label }),
+    });
+    await loadVersions();
+    toast('📌 バージョンを保存しました。閲覧モード→差分表示で比較できます');
+  } catch (e) {
+    toast('⚠ バージョン保存に失敗しました: ' + e.message);
+  }
+}
+
+// ---------- バージョン ----------
+async function loadVersions() {
+  if (!state.file) { state.versions = []; return; }
+  const { versions } = await api('/api/versions?path=' + encodeURIComponent(state.file));
+  state.versions = versions;
+  if (!versions.find((v) => v.id === state.diffVersionId)) {
+    state.diffVersionId = versions[0]?.id || null;
+  }
+}
+
+function versionLabel(v) {
+  const t = v.stamp.replace('T', ' ').replace(/-(\d\d)-(\d\d\d)Z?$/, ':$1');
+  return (v.label ? v.label + ' — ' : '') + t;
+}
+
+// ---------- モード切替・表示 ----------
+function setMode(mode) {
+  if (mode === state.mode) return;
+  state.mode = mode;
+  $('btnEdit').classList.toggle('active', mode === 'edit');
+  $('btnView').classList.toggle('active', mode === 'view');
+  refreshPane();
+}
+
+function setViewSub(sub) {
+  state.viewSub = sub;
+  refreshPane();
+}
+
+async function refreshPane() {
+  const showEditor = state.mode === 'edit';
+  const showViewer = state.mode === 'view' && state.viewSub === 'normal';
+  const showDiff = state.mode === 'view' && state.viewSub === 'diff';
+  $('editorPane').classList.toggle('visible', showEditor);
+  $('viewerPane').classList.toggle('visible', showViewer);
+  $('diffPane').classList.toggle('visible', showDiff);
+  renderSubbar();
+  updateTableTools();
+  if (showEditor) { scheduleEditorDiagrams(); startOverlaySync(); }
+  else { $('mermaidOverlayLayer').innerHTML = ''; stopOverlaySync(); }
+  if (showViewer) await renderViewer();
+  if (showDiff) await renderDiff();
+}
+
+function renderSubbar() {
+  document.querySelectorAll('.subbar.dynamic').forEach((e) => e.remove());
+  if (state.mode !== 'view') return;
+
+  const bar = document.createElement('div');
+  bar.className = 'subbar dynamic';
+
+  const btnNormal = document.createElement('button');
+  btnNormal.textContent = '📖 通常表示';
+  btnNormal.title = '文書を読みやすく表示します。図もここで表示されます';
+  btnNormal.className = state.viewSub === 'normal' ? 'active' : '';
+  btnNormal.onclick = () => setViewSub('normal');
+
+  const btnDiff = document.createElement('button');
+  btnDiff.textContent = '🔍 差分表示';
+  btnDiff.title = '過去に「バージョン保存」した時点と現在の違いを表示します';
+  btnDiff.className = state.viewSub === 'diff' ? 'active' : '';
+  btnDiff.onclick = () => setViewSub('diff');
+
+  bar.append(btnNormal, btnDiff);
+
+  const btnPrint = document.createElement('button');
+  btnPrint.textContent = '🖨 印刷 / PDF';
+  btnPrint.title = 'いま表示している内容を印刷、またはPDFとして保存します（ブラウザの印刷画面が開きます）';
+  btnPrint.onclick = () => window.print();
+  bar.appendChild(btnPrint);
+
+  if (state.viewSub === 'normal') {
+    const btnHtml = document.createElement('button');
+    btnHtml.textContent = '💾 HTML保存';
+    btnHtml.title = 'この文書を、図も表示された状態のまま単体で開けるHTMLファイルとして保存します（メール添付や共有に）';
+    btnHtml.onclick = saveViewAsHtml;
+    bar.appendChild(btnHtml);
+  }
+
+  if (state.viewSub === 'diff') {
+    const sel = document.createElement('select');
+    if (!state.versions.length) {
+      sel.innerHTML = '<option>保存済みバージョンなし</option>';
+      sel.disabled = true;
+    } else {
+      for (const v of state.versions) {
+        const opt = document.createElement('option');
+        opt.value = v.id;
+        opt.textContent = '比較元: ' + versionLabel(v);
+        if (v.id === state.diffVersionId) opt.selected = true;
+        sel.appendChild(opt);
+      }
+    }
+    sel.onchange = () => { state.diffVersionId = sel.value; renderDiff(); };
+    bar.appendChild(sel);
+
+    const btnSaveDiff = document.createElement('button');
+    btnSaveDiff.textContent = '💾 この差分を保存';
+    btnSaveDiff.title = 'いま表示している赤入りの差分を、そのまま開けるHTMLファイルとして保存します';
+    btnSaveDiff.disabled = !state.versions.length;
+    btnSaveDiff.onclick = saveDiffAsHtml;
+    bar.appendChild(btnSaveDiff);
+
+    const btnRestore = document.createElement('button');
+    btnRestore.textContent = '↩ このバージョンに戻す';
+    btnRestore.title = '比較元バージョンの内容を編集画面に読み込みます。現在の内容は自動でバックアップされます';
+    btnRestore.disabled = !state.versions.length;
+    btnRestore.onclick = restoreVersion;
+    bar.appendChild(btnRestore);
+
+    const btnImport = document.createElement('button');
+    btnImport.textContent = '📥 比較用mdを取り込む';
+    btnImport.title = '手元にある別のmdファイル(メールでもらった旧版など)を、このファイルの比較用バージョンとして取り込みます';
+    btnImport.onclick = () => $('importVersionInput').click();
+    bar.appendChild(btnImport);
+
+    const hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.innerHTML = '<span style="color:#d61c1c">赤=追加・変更</span> / <del style="color:#999">取り消し線=削除</del>';
+    bar.appendChild(hint);
+  }
+
+  const target = state.viewSub === 'diff' ? $('diffPane') : $('viewerPane');
+  target.prepend(bar);
+}
+
+async function renderViewer() {
+  const el = $('viewerContent');
+  if (!state.file) { el.innerHTML = ''; return; }
+  const tmp = document.createElement('div');
+  const viewer = toastui.Editor.factory({ el: tmp, viewer: true, initialValue: editor.getMarkdown(), usageStatistics: false });
+  el.innerHTML = tmp.querySelector('.toastui-editor-contents').innerHTML;
+  viewer.destroy();
+  await renderMermaidIn(el);
+}
+
+async function renderMermaidIn(container) {
+  const blocks = container.querySelectorAll('pre > code.language-mermaid, pre[data-language="mermaid"] code, code[data-language="mermaid"]');
+  let i = 0;
+  for (const code of blocks) {
+    const src = code.textContent;
+    const holder = document.createElement('div');
+    holder.className = 'mermaid-diagram';
+    try {
+      const { svg } = await mermaid.render('mmd-' + Date.now() + '-' + i++, src);
+      holder.innerHTML = svg;
+    } catch (e) {
+      holder.innerHTML = '<pre style="color:#c00">この図は表示できませんでした（書き方に誤りがあります）:\n' + e.message + '</pre>';
+    }
+    code.closest('pre').replaceWith(holder);
+  }
+}
+
+async function renderDiff() {
+  const el = $('diffContent');
+  if (!state.file) { el.innerHTML = ''; return; }
+  if (!state.diffVersionId) {
+    el.innerHTML = '<div style="color:#889;padding:40px;text-align:center;line-height:2">まだ比較元となるバージョンがありません。次のどちらかで用意できます。<br><b>📌 バージョン保存</b> … 現在の内容を記録しておき、修正後にここで差分を見る<br><b>📥 比較用mdを取り込む</b> … 手元にある旧版のmdファイルを選んで、今の内容と比較する</div>';
+    return;
+  }
+  try {
+    if (state.dirty) await saveFile();
+    const { html } = await api(
+      '/api/diff?path=' + encodeURIComponent(state.file) + '&id=' + encodeURIComponent(state.diffVersionId)
+    );
+    // 取り込んだmdに仕込まれたスクリプト等を無害化してから表示する
+    el.innerHTML = DOMPurify.sanitize(html);
+  } catch (e) {
+    el.innerHTML = '<div style="color:#a55;padding:40px;text-align:center;line-height:2">差分を表示できませんでした: ' + e.message + '<br>比較元のバージョンを選び直すか、一覧を更新してみてください。</div>';
+    await loadVersions();
+  }
+}
+
+// 比較元バージョンの内容をエディタに読み込む(過去バージョンの復元)
+async function restoreVersion() {
+  if (!state.file || !state.diffVersionId) return;
+  const v = state.versions.find((x) => x.id === state.diffVersionId);
+  if (!confirm(`「${versionLabel(v)}」の内容に戻します。\n現在の内容は「復元前の自動バックアップ」としてバージョン保存されるので、後から見返せます。\nよろしいですか？`)) return;
+  try {
+  if (state.dirty) await saveFile();
+  await api('/api/version', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: state.file, label: '復元前の自動バックアップ' }),
+  });
+  const { content } = await api(
+    '/api/version-content?path=' + encodeURIComponent(state.file) + '&id=' + encodeURIComponent(state.diffVersionId)
+  );
+  editor.setMarkdown(content, false);
+  setDirty(true);
+  await loadVersions();
+  setMode('edit');
+  toast('↩ 過去バージョンを読み込みました。💾 保存すると確定します');
+  } catch (e) {
+    toast('⚠ 復元に失敗しました: ' + e.message);
+  }
+}
+
+// HTML書き出しの共通スタイル
+const EXPORT_CSS = `
+body { font-family: "Segoe UI","Hiragino Sans","Meiryo",sans-serif; max-width: 900px; margin: 24px auto; padding: 0 20px; color: #223; line-height: 1.8; }
+.meta { color: #667; font-size: 13px; border-bottom: 2px solid #e2e8ee; padding-bottom: 10px; margin-bottom: 20px; }
+ins { color: #d61c1c; background: #ffecec; text-decoration: none; }
+del { color: #999; text-decoration: line-through; background: #f2f2f2; }
+img.diffins { outline: 3px solid #d61c1c; } img.diffdel { outline: 3px solid #bbb; opacity: .5; }
+h1 { border-bottom: 2px solid #e2e8ee; padding-bottom: 6px; } h2 { border-bottom: 1px solid #e2e8ee; padding-bottom: 4px; }
+table { border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 6px 10px; } th { background: #f4f6f8; }
+pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+code { background: #f0f2f4; padding: 1px 5px; border-radius: 3px; font-size: .9em; } pre code { background: none; }
+blockquote { border-left: 4px solid #cfd8e0; margin-left: 0; padding-left: 14px; color: #556; }
+img { max-width: 100%; } ul.task-list, .task-list-item { list-style: none; }
+`;
+
+function exportStamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return {
+    label: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`,
+    file: `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`,
+  };
+}
+
+// 表示中の文書(通常表示)を、図も入った単体HTMLとして保存する
+async function saveViewAsHtml() {
+  if (!state.file) return toast('先にファイルを開いてください');
+  await renderViewer();  // 最新の内容(未保存の編集も含む)を描画してから書き出す
+  const html = DOMPurify.sanitize($('viewerContent').innerHTML);
+  if (!html) return toast('保存できる内容がありません');
+  const s = exportStamp();
+  const base = state.file.replace(/\.md$/i, '').replace(/[\\/]/g, '_');
+  const name = `${base}_${s.file}.html`;
+  const doc = `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><title>${base}</title>
+<style>${EXPORT_CSS}</style></head><body>
+<div class="meta">${state.file} ／ 書き出し: ${s.label}</div>
+${html}
+</body></html>`;
+  await api('/api/file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: name, content: doc }),
+  });
+  const w = window.open('/' + encodeURIComponent(name));
+  if (w) toast('💾 「' + name + '」として保存し、新しいタブで開きました');
+  else toast('💾 「' + name + '」として保存しました(文書と同じフォルダにあります)');
+}
+
+// 表示中の差分を、単体で開ける「赤入りHTML」として保存する
+async function saveDiffAsHtml() {
+  const html = DOMPurify.sanitize($('diffContent').innerHTML);
+  if (!state.file || !state.diffVersionId || !html) return toast('差分が表示されていません');
+  const v = state.versions.find((x) => x.id === state.diffVersionId);
+  const s = exportStamp();
+  const base = state.file.replace(/\.md$/i, '').replace(/[\\/]/g, '_');
+  const name = `差分_${base}_${s.file}.html`;
+  const doc = `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><title>差分: ${state.file}</title>
+<style>${EXPORT_CSS}</style></head><body>
+<div class="meta"><b>差分レポート:</b> ${state.file}<br>
+比較元バージョン: ${versionLabel(v)} ／ 作成日時: ${s.label}<br>
+<span style="color:#d61c1c">赤=追加・変更</span> ／ <del>取り消し線=削除</del></div>
+${html}
+</body></html>`;
+  await api('/api/file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: name, content: doc }),
+  });
+  const w = window.open('/' + encodeURIComponent(name));
+  if (w) toast('💾 「' + name + '」として保存し、新しいタブで開きました');
+  else toast('💾 「' + name + '」として保存しました(文書と同じフォルダにあります)');
+}
+
+// ---------- 新規ファイル ----------
+async function newFile() {
+  const name = prompt('新しいファイルの名前を入力してください (例: 議事録):', '');
+  if (!name) return;
+  const rel = (name.endsWith('.md') ? name : name + '.md');
+  try {
+    // 既存ファイルと同名なら、上書きせずそのファイルを開く
+    const { files } = await api('/api/files');
+    if (files.includes(rel.replace(/\\/g, '/'))) {
+      toast('⚠ 同名のファイルが既にあるため、そのファイルを開きました(上書きはしていません)');
+      await openFile(rel);
+      setMode('edit');
+      return;
+    }
+    await api('/api/file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: rel, content: '# ' + rel.replace(/\.md$/, '') + '\n\nここに本文を書いてください。\n' }),
+    });
+    await loadFiles();
+    await openFile(rel);
+    setMode('edit');
+  } catch (e) {
+    toast('⚠ 作成できませんでした: ' + e.message);
+  }
+}
+
+// ================= 編集モード内のMermaidライブプレビュー =================
+// WYSIWYGエディタ内のmermaidコードブロックの位置に、描画した図を重ねて表示する。
+// 図をクリックすると編集画面(🎨モーダル)が開く。
+let inlineIdCounter = 0;
+let inlineRenderTimer = null;
+const inlineSvgCache = new Map(); // code -> svg(失敗時はnull)
+
+const MERMAID_KEYWORDS = /^(graph|flowchart|sequenceDiagram|gantt|pie|stateDiagram|classDiagram|erDiagram|journey|mindmap|timeline)\b/;
+
+function findEditorMermaidBlocks() {
+  const out = [];
+  for (const pre of document.querySelectorAll('#editor .ProseMirror pre')) {
+    const code = pre.querySelector('code');
+    if (!code) continue;
+    const lang = code.getAttribute('data-language') || pre.getAttribute('data-language') || '';
+    const text = (code.textContent || '').trim();
+    if (lang === 'mermaid' || MERMAID_KEYWORDS.test(text)) out.push({ pre, code: text });
+  }
+  return out;
+}
+
+let overlayItems = []; // {el, target, kind: 'mermaid'|'img'}
+
+// ---- Markdownをブロック単位(空行区切り、コードフェンスは一塊)で扱うユーティリティ ----
+function splitMdBlocks(md) {
+  const lines = md.replace(/\r\n/g, '\n').split('\n');
+  const blocks = [];
+  let cur = [];
+  let inFence = false;
+  for (const line of lines) {
+    if (/^(```|~~~)/.test(line.trim())) inFence = !inFence;
+    if (!inFence && line.trim() === '') {
+      if (cur.length) { blocks.push(cur.join('\n')); cur = []; }
+    } else {
+      cur.push(line);
+    }
+  }
+  if (cur.length) blocks.push(cur.join('\n'));
+  return blocks;
+}
+
+function isMermaidMdBlock(b) {
+  const t = b.trimStart();
+  if (!t.startsWith('```')) return false;
+  const lines = t.split('\n');
+  return /mermaid/.test(lines[0]) || MERMAID_KEYWORDS.test((lines[1] || '').trim());
+}
+
+function nthMatch(test, n) {
+  let c = -1;
+  return (b) => test(b) && ++c === n;
+}
+
+function moveBlockInMd(pred, dir) {
+  const blocks = splitMdBlocks(editor.getMarkdown());
+  const i = blocks.findIndex(pred);
+  if (i < 0) return;
+  const j = i + dir;
+  if (j < 0 || j >= blocks.length) return toast(dir < 0 ? 'これ以上、上に移動できません' : 'これ以上、下に移動できません');
+  [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+  editor.setMarkdown(blocks.join('\n\n') + '\n', false);
+  setDirty(true);
+  scheduleEditorDiagrams();
+}
+
+function deleteBlockInMd(pred, label) {
+  if (!confirm(label + ' を削除します。よろしいですか？')) return;
+  const blocks = splitMdBlocks(editor.getMarkdown());
+  const i = blocks.findIndex(pred);
+  if (i < 0) return;
+  blocks.splice(i, 1);
+  editor.setMarkdown(blocks.join('\n\n') + '\n', false);
+  setDirty(true);
+  scheduleEditorDiagrams();
+  toast('🗑 削除しました（💾 保存するまでファイルには反映されません）');
+}
+
+function scheduleEditorDiagrams() {
+  clearTimeout(inlineRenderTimer);
+  inlineRenderTimer = setTimeout(updateEditorDiagrams, 350);
+}
+
+// 編集モードの間、図の位置を毎フレーム本文に追従させる。
+// 本文の増減で再レイアウトが起きても、図が古い位置に取り残されて本文に被るのを防ぐ。
+let syncRafId = null;
+function startOverlaySync() {
+  if (syncRafId !== null) return;
+  const tick = () => {
+    if (state.mode !== 'edit' || !state.file) { syncRafId = null; return; }
+    if (overlayItems.length) repositionEditorDiagrams();
+    if ($('tableTools').style.display === 'flex') updateTableTools();
+    syncRafId = requestAnimationFrame(tick);
+  };
+  syncRafId = requestAnimationFrame(tick);
+}
+function stopOverlaySync() {
+  if (syncRafId !== null) { cancelAnimationFrame(syncRafId); syncRafId = null; }
+}
+
+function repositionEditorDiagrams() {
+  if (!overlayItems.length) return;
+  // ProseMirrorは編集のたびにpre要素を作り直すため、保持参照ではなく毎回取り直す
+  const blocks = findEditorMermaidBlocks();
+  const imgs = [...document.querySelectorAll('#editor .ProseMirror img')]
+    .filter((im) => ((im.getAttribute('src') || '').replace(/^\//, '')).startsWith('assets/'));
+
+  // 図の分の高さはCSS(pre:has(code[data-language=mermaid]))で確保済み。
+  // ここでは対象を割り当て、preの実寸にカードを重ねるだけ。
+  const targets = [];
+  let mi = 0, ii = 0;
+  for (const it of overlayItems) {
+    targets.push(it.kind === 'mermaid' ? (blocks[mi++] || {}).pre : imgs[ii++]);
+  }
+  const paneRect = $('editorPane').getBoundingClientRect();
+  for (let k = 0; k < overlayItems.length; k++) {
+    const it = overlayItems[k];
+    const target = targets[k];
+    if (!target) { it.el.style.display = 'none'; continue; }
+    it.el.style.display = '';
+    const r = target.getBoundingClientRect();
+    if (it.kind === 'mermaid') {
+      // カードはコードブロック(pre)の箱にぴったり重ねる(コード文字が下からはみ出て本文と混ざらない)
+      Object.assign(it.el.style, {
+        left: (r.left - paneRect.left) + 'px',
+        top: (r.top - paneRect.top) + 'px',
+        width: r.width + 'px',
+        height: r.height + 'px',
+      });
+    } else {
+      // 画像の上端に右寄せでツールバーを重ねる
+      Object.assign(it.el.style, {
+        left: (r.left - paneRect.left) + 'px',
+        top: (r.top - paneRect.top + 6) + 'px',
+        width: r.width + 'px',
+      });
+    }
+  }
+}
+
+// mermaid SVGのviewBoxから図の自然な高さを取り、コードブロック側の高さを図に合わせて確保する
+function svgNaturalHeight(svg) {
+  const m = /viewBox="[\d.\-]+ [\d.\-]+ ([\d.]+) ([\d.]+)"/.exec(svg);
+  return m ? parseFloat(m[2]) : 240;
+}
+
+async function updateEditorDiagrams() {
+  const layer = $('mermaidOverlayLayer');
+  if (state.mode !== 'edit' || !state.file) { layer.innerHTML = ''; overlayItems = []; return; }
+  layer.innerHTML = '';
+  overlayItems = [];
+
+  // ---- mermaidブロック → 図カードを重ねる ----
+  const blocks = findEditorMermaidBlocks();
+  for (let i = 0; i < blocks.length; i++) {
+    const code = blocks[i].code;
+    let entry = inlineSvgCache.get(code);
+    if (entry === undefined) {
+      try {
+        const { svg } = await mermaid.render('inline-mmd-' + inlineIdCounter++, code);
+        const h = Math.min(Math.max(svgNaturalHeight(svg) + 40, 160), 560);
+        entry = { svg, h };
+      } catch (e) {
+        entry = { svg: null, h: 0 };
+        document.querySelectorAll('body > [id^="dinline-mmd-"], body > [id^="inline-mmd-"]').forEach((n) => n.remove());
+      }
+      inlineSvgCache.set(code, entry);
+    }
+
+    const card = document.createElement('div');
+    card.className = 'mm-inline' + (entry.svg ? '' : ' invalid');
+    const tools = `<div class="mm-inline-tools">` +
+      `<button data-act="edit" title="プレビューを見ながら書き換え">${entry.svg ? '✏️ 編集' : '⚠ 書きかけの図 — 押して編集'}</button>` +
+      (entry.svg ? `<button data-act="drawio" title="draw.ioの図形に変換してマウス編集に切り替え(一方向)">🎨 draw.io化</button>` : '') +
+      `<button data-act="up" title="図を1つ上へ移動">⬆</button>` +
+      `<button data-act="down" title="図を1つ下へ移動">⬇</button>` +
+      `<button data-act="del" title="図を削除">🗑</button></div>`;
+    card.innerHTML = (entry.svg ? `<div class="mm-inline-svg" title="クリックで図を編集">${entry.svg}</div>` : '') + tools;
+    if (entry.svg) card.querySelector('.mm-inline-svg').onclick = () => openDiagramModal(i);
+    wireBlockTools(card, i, isMermaidMdBlock, `図${i + 1}`, () => openDiagramModal(i));
+    layer.appendChild(card);
+    overlayItems.push({ el: card, kind: 'mermaid', h: entry.svg ? entry.h : 0 });
+  }
+
+  // ---- draw.ioで描いた画像(assets/) → 編集・移動ツールバーを重ねる ----
+  let imgIdx = -1;
+  for (const img of document.querySelectorAll('#editor .ProseMirror img')) {
+    const src = (img.getAttribute('src') || '').replace(/^\//, '');
+    if (!src.startsWith('assets/')) continue;
+    imgIdx++;
+    const bar = document.createElement('div');
+    bar.className = 'img-tools';
+    bar.innerHTML =
+      `<button data-act="edit" title="この図をdraw.ioで開いて描き直します">✏️ draw.ioで編集</button>` +
+      `<button data-act="up" title="図を1つ上へ移動">⬆</button>` +
+      `<button data-act="down" title="図を1つ下へ移動">⬇</button>` +
+      `<button data-act="del" title="図を削除">🗑</button>`;
+    const isThisImg = (b) => b.includes(src);
+    wireBlockTools(bar, 0, isThisImg, `画像(${src.split('/').pop()})`, () => openDrawioEditor(src));
+    layer.appendChild(bar);
+    overlayItems.push({ el: bar, kind: 'img' });
+  }
+
+  repositionEditorDiagrams();
+  // フォント読込や画像ロードなど遅れて起きるレイアウト変化にも追従させる
+  setTimeout(repositionEditorDiagrams, 300);
+  setTimeout(repositionEditorDiagrams, 1000);
+}
+
+// 図カード/画像バーの ✏️⬆⬇🗑 ボタンに動作を割り当てる
+function wireBlockTools(container, nth, test, label, onEdit) {
+  container.querySelectorAll('button[data-act]').forEach((b) => {
+    b.onclick = (ev) => {
+      ev.stopPropagation();
+      const act = b.dataset.act;
+      if (act === 'edit') onEdit();
+      else if (act === 'drawio') convertMermaidToDrawio(nth);
+      else if (act === 'up') moveBlockInMd(nthMatch(test, nth), -1);
+      else if (act === 'down') moveBlockInMd(nthMatch(test, nth), 1);
+      else if (act === 'del') deleteBlockInMd(nthMatch(test, nth), label);
+    };
+  });
+}
+
+// ================= 表の編集ツールバー =================
+// 表の中にカーソルを置くと、その表の真上に行・列の追加/削除ボタンを表示する
+let tableToolsTimer = null;
+
+function updateTableTools() {
+  const tt = $('tableTools');
+  if (state.mode !== 'edit' || !state.file) { tt.style.display = 'none'; return; }
+  const sel = document.getSelection();
+  const node = sel && sel.anchorNode;
+  const el = node ? (node.nodeType === 1 ? node : node.parentElement) : null;
+  const table = el && el.closest ? el.closest('#editor .ProseMirror table') : null;
+  // 編集操作直後はProseMirrorが表を作り直すため、切り離された旧要素を掴んでいたら表示しない
+  if (!table || !table.isConnected) { tt.style.display = 'none'; return; }
+  const paneRect = $('editorPane').getBoundingClientRect();
+  const r = table.getBoundingClientRect();
+  if (!r.width) { tt.style.display = 'none'; return; }
+  tt.style.display = 'flex';
+  tt.style.left = Math.max(0, r.left - paneRect.left) + 'px';
+  tt.style.top = Math.max(0, r.top - paneRect.top - 40) + 'px';
+  tt.style.width = '';  // ボタンの自然な幅で表示(表が狭くてもあふれない)
+}
+
+document.addEventListener('selectionchange', () => {
+  clearTimeout(tableToolsTimer);
+  tableToolsTimer = setTimeout(updateTableTools, 150);
+});
+
+document.querySelectorAll('#tableTools button').forEach((b) => {
+  b.addEventListener('mousedown', (e) => e.preventDefault());  // エディタ内のカーソル位置を保つ
+  b.addEventListener('click', () => {
+    try {
+      editor.exec(b.dataset.cmd);
+      setDirty(true);
+      setTimeout(updateTableTools, 100);
+    } catch (e) {
+      toast('操作に失敗しました: ' + e.message);
+    }
+  });
+});
+
+// ================= 図の挿入 =================
+const MERMAID_TEMPLATES = {
+  flow: {
+    code: `graph TD\n    A[開始] --> B{条件を満たす?}\n    B -->|はい| C[処理を実行]\n    B -->|いいえ| D[別の処理]\n    C --> E[終了]\n    D --> E`,
+    help: `<b>フロー図の書き方:</b> <code>A --> B</code> で矢印がつながります。箱の形は <code>[四角]</code> <code>{ひし形(分岐)}</code> <code>(丸)</code>。矢印に文字を付けるには <code>-->|文字|</code>`,
+  },
+  sequence: {
+    code: `sequenceDiagram\n    participant A as ユーザー\n    participant B as システム\n    A->>B: 申請を送る\n    B-->>A: 受付結果を返す\n    B->>B: 内部で処理`,
+    help: `<b>シーケンス図の書き方:</b> <code>participant 名前</code> で登場人物を決め、<code>A->>B: 内容</code> で矢印。<code>-->></code> は点線(返信)`,
+  },
+  gantt: {
+    code: `gantt\n    title 作業スケジュール\n    dateFormat YYYY-MM-DD\n    section 準備\n    要件整理 :a1, 2026-08-01, 5d\n    section 作業\n    実施 :after a1, 10d\n    確認 :3d`,
+    help: `<b>ガントチャートの書き方:</b> <code>作業名 : 開始日, 日数</code>。<code>after a1</code> で「a1の後」。<code>section</code> でグループ分け`,
+  },
+  pie: {
+    code: `pie title 内訳\n    "項目A" : 45\n    "項目B" : 30\n    "項目C" : 25`,
+    help: `<b>円グラフの書き方:</b> <code>"名前" : 数値</code> を並べるだけ。割合は自動計算されます`,
+  },
+  state: {
+    code: `stateDiagram-v2\n    [*] --> 受付\n    受付 --> 処理中 : 開始\n    処理中 --> 完了 : 正常終了\n    処理中 --> エラー : 失敗\n    エラー --> 受付 : 再実行\n    完了 --> [*]`,
+    help: `<b>状態遷移図の書き方:</b> <code>状態A --> 状態B : きっかけ</code>。<code>[*]</code> は開始/終了`,
+  },
+};
+
+let mermaidRenderTimer = null;
+let editingDiagramIndex = null; // null=新規, 数値=既存のn番目のmermaidブロックを置換
+
+function getMermaidBlocks(md) {
+  const re = /```mermaid\r?\n([\s\S]*?)```/g;
+  const blocks = [];
+  let m;
+  while ((m = re.exec(md))) blocks.push({ full: m[0], code: m[1], index: m.index });
+  return blocks;
+}
+
+function openDiagramModal(targetIndex) {
+  if (!state.file) return toast('先にファイルを開いてください');
+  drawioSession = { mode: 'new' };
+  // 既存図の一覧を「挿入先」に反映
+  const sel = $('mmTarget');
+  sel.innerHTML = '<option value="new">▼ 挿入先: 新しい図として追加</option>';
+  const blocks = getMermaidBlocks(editor.getMarkdown());
+  blocks.forEach((b, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    const firstLine = b.code.trim().split('\n')[0].slice(0, 30);
+    opt.textContent = `既存の図${i + 1} を書き換える (${firstLine})`;
+    sel.appendChild(opt);
+  });
+  switchDiagramTab('mermaid');
+  $('diagramModal').classList.add('show');
+  if (typeof targetIndex === 'number' && blocks[targetIndex]) {
+    // 編集モードで図をクリックした場合: その図を読み込んで開く
+    sel.value = String(targetIndex);
+    $('mmCode').value = blocks[targetIndex].code.trim();
+  } else if (!$('mmCode').value.trim()) {
+    applyTemplate();
+  }
+  renderMermaidPreview();
+}
+
+function closeDiagramModal() {
+  $('diagramModal').classList.remove('show');
+  $('drawioFrame').src = 'about:blank';
+  drawioSession = null;
+}
+
+function switchDiagramTab(tab) {
+  $('tabMermaid').classList.toggle('active', tab === 'mermaid');
+  $('tabDrawio').classList.toggle('active', tab === 'drawio');
+  $('diagramMermaid').style.display = tab === 'mermaid' ? 'flex' : 'none';
+  $('diagramDrawio').style.display = tab === 'drawio' ? 'block' : 'none';
+  $('mermaidFoot').style.display = tab === 'mermaid' ? 'flex' : 'none';
+  if (tab === 'drawio' && $('drawioFrame').src === 'about:blank' || tab === 'drawio' && !$('drawioFrame').src) {
+    $('drawioFrame').src = 'https://embed.diagrams.net/?embed=1&ui=kennedy&spin=1&proto=json&lang=ja&saveAndExit=1&noSaveBtn=0';
+  }
+}
+
+function applyTemplate() {
+  const t = MERMAID_TEMPLATES[$('mmTemplate').value];
+  $('mmCode').value = t.code;
+  $('mmHelp').innerHTML = t.help;
+  renderMermaidPreview();
+}
+
+async function renderMermaidPreview() {
+  const code = $('mmCode').value.trim();
+  const box = $('mmPreview');
+  if (!code) { box.innerHTML = '<p style="color:#889">左に図の内容を書いてください</p>'; return; }
+  try {
+    const { svg } = await mermaid.render('mm-preview-' + Date.now(), code);
+    box.innerHTML = svg;
+  } catch (e) {
+    box.innerHTML = '<div class="err">⚠ まだ図にできません（続きを書くか、書き方を確認してください）\n\n' + e.message + '</div>';
+    // mermaidはエラー時にDOMにゴミ要素を残すことがあるため掃除
+    document.querySelectorAll('body > [id^="dmm-preview-"], body > [id^="mm-preview-"]').forEach((n) => n.remove());
+  }
+}
+
+function insertMermaid() {
+  const code = $('mmCode').value.trim();
+  if (!code) return toast('図の内容が空です');
+  const block = '```mermaid\n' + code + '\n```';
+  const md = editor.getMarkdown();
+  const targetVal = $('mmTarget').value;
+  let newMd;
+  if (targetVal === 'new') {
+    newMd = md.replace(/\s*$/, '') + '\n\n' + block + '\n';
+    toast('文書の末尾に図を追加しました（図をクリックすると再編集できます）');
+  } else {
+    const blocks = getMermaidBlocks(md);
+    const b = blocks[Number(targetVal)];
+    newMd = md.slice(0, b.index) + block + md.slice(b.index + b.full.length);
+    toast('図を書き換えました');
+  }
+  editor.setMarkdown(newMd, false);
+  setDirty(true);
+  closeDiagramModal();
+  scheduleEditorDiagrams();
+}
+
+// 挿入先で既存の図を選んだら、そのコードを読み込む
+$('mmTarget').addEventListener('change', () => {
+  const v = $('mmTarget').value;
+  if (v === 'new') return;
+  const b = getMermaidBlocks(editor.getMarkdown())[Number(v)];
+  if (b) { $('mmCode').value = b.code.trim(); renderMermaidPreview(); }
+});
+
+// ---------- draw.io連携 ----------
+const DRAWIO_URL = 'https://embed.diagrams.net/?embed=1&ui=kennedy&spin=1&proto=json&lang=ja&saveAndExit=1&noSaveBtn=0';
+// draw.ioセッション: 何を読み込み、保存時に何をするかを表す
+//  { mode:'new' }                       新規作図 → 保存時に画像を新規挿入
+//  { mode:'editImage', path }           既存画像を再編集 → 保存時に同じファイルへ上書き
+//  { mode:'convert', xml, blockIndex }  Mermaidから変換 → 保存時に画像を保存しMermaidブロックを置換
+let drawioSession = null;
+
+// 文書内のdraw.io画像を再編集する(保存すると同じファイルに上書きされる)
+function openDrawioEditor(path) {
+  drawioSession = { mode: 'editImage', path };
+  $('diagramModal').classList.add('show');
+  switchDiagramTab('drawio');
+  $('drawioFrame').src = DRAWIO_URL;  // 毎回リロードしてinitイベントを受け取る
+}
+
+// ---- Mermaidフロー図 → draw.io編集可能図形への変換 ----
+// MermaidのSVGからノード(位置/形/ラベル)と辺(接続元→先/ラベル)を読み取り、draw.io図形XMLを生成する
+async function mermaidToDrawioXml(code) {
+  let svg;
+  try { ({ svg } = await mermaid.render('conv-' + Date.now(), code)); } catch { return null; }
+  const div = document.createElement('div');
+  div.style.cssText = 'position:absolute;left:-99999px;top:-99999px';
+  div.innerHTML = svg;
+  document.body.appendChild(div);
+  try {
+    const s = div.querySelector('svg');
+    const nodes = [...s.querySelectorAll('g.node')].map((g) => {
+      const m = /translate\(([-\d.]+),\s*([-\d.]+)\)/.exec(g.getAttribute('transform') || '');
+      const cx = m ? +m[1] : 0, cy = m ? +m[2] : 0;
+      let bb; try { bb = g.getBBox(); } catch { bb = { width: 60, height: 40 }; }
+      const idm = /^flowchart-(.+)-\d+$/.exec(g.id || '');
+      const name = idm ? idm[1] : g.id;
+      const shapeEl = g.querySelector('polygon,circle,ellipse,rect');
+      const shape = shapeEl ? shapeEl.tagName.toLowerCase() : 'rect';
+      const label = ((g.querySelector('.nodeLabel') || g.querySelector('foreignObject') || g.querySelector('text') || {}).textContent || '').trim();
+      return { name, cx, cy, w: Math.max(bb.width, 40), h: Math.max(bb.height, 30), shape, label };
+    });
+    const edges = [...s.querySelectorAll('path.flowchart-link')].map((p) => {
+      const cls = p.getAttribute('class') || '';
+      const sm = /LS-([A-Za-z0-9_]+)/.exec(cls), tm = /LE-([A-Za-z0-9_]+)/.exec(cls);
+      return { src: sm ? sm[1] : null, tgt: tm ? tm[1] : null };
+    });
+    const labels = [...s.querySelectorAll('g.edgeLabels g.edgeLabel')].map((g) => (g.textContent || '').trim());
+    if (!nodes.length) return null;  // フロー図以外(pie/sequence/gantt等)は変換非対応
+    return buildDrawioMxXml(nodes, edges, labels);
+  } finally {
+    div.remove();
+  }
+}
+
+function buildDrawioMxXml(nodes, edges, labels) {
+  const esc = (t) => (t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const idOf = {};
+  let cells = '';
+  let n = 2;
+  for (const nd of nodes) {
+    const cid = 'n' + (n++);
+    idOf[nd.name] = cid;
+    let style;
+    if (nd.shape === 'polygon') style = 'rhombus;whiteSpace=wrap;html=1;';
+    else if (nd.shape === 'circle' || nd.shape === 'ellipse') style = 'ellipse;whiteSpace=wrap;html=1;';
+    else style = 'rounded=0;whiteSpace=wrap;html=1;';
+    const x = Math.round(nd.cx - nd.w / 2), y = Math.round(nd.cy - nd.h / 2);
+    cells += `<mxCell id="${cid}" value="${esc(nd.label)}" style="${style}" vertex="1" parent="1"><mxGeometry x="${x}" y="${y}" width="${Math.round(nd.w)}" height="${Math.round(nd.h)}" as="geometry"/></mxCell>`;
+  }
+  edges.forEach((e, i) => {
+    if (!idOf[e.src] || !idOf[e.tgt]) return;
+    cells += `<mxCell id="e${n++}" value="${esc(labels[i] || '')}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="${idOf[e.src]}" target="${idOf[e.tgt]}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
+  });
+  return `<mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169"><root><mxCell id="0"/><mxCell id="1" parent="0"/>${cells}</root></mxGraphModel>`;
+}
+
+// Mermaid図をdraw.io図に変換して編集(一方向)
+async function convertMermaidToDrawio(blockIndex) {
+  const blocks = getMermaidBlocks(editor.getMarkdown());
+  const b = blocks[blockIndex];
+  if (!b) return;
+  const xml = await mermaidToDrawioXml(b.code.trim());
+  if (!xml) {
+    toast('この図はdraw.io変換に未対応です(フロー図 graph/flowchart のみ対応)。');
+    return;
+  }
+  if (!confirm('この図をdraw.io図に変換します。\n\n・変換後はマウスで自由に編集できます\n・ただしMermaid(文字)としての編集はできなくなります(一方向)\n\nよろしいですか？')) return;
+  drawioSession = { mode: 'convert', xml, blockIndex };
+  $('diagramModal').classList.add('show');
+  switchDiagramTab('drawio');
+  $('drawioFrame').src = DRAWIO_URL;
+}
+
+window.addEventListener('message', async (e) => {
+  if (!String(e.origin).includes('diagrams.net')) return;
+  let msg;
+  try { msg = JSON.parse(e.data); } catch { return; }
+  const frame = $('drawioFrame').contentWindow;
+  const sess = drawioSession || { mode: 'new' };
+  if (msg.event === 'init') {
+    if (sess.mode === 'convert') {
+      frame.postMessage(JSON.stringify({ action: 'load', xml: sess.xml }), '*');
+    } else if (sess.mode === 'editImage') {
+      // 既存SVG(drawioのXML入り)を読み込んで編集を再開する
+      try {
+        const blob = await (await fetch('/' + sess.path)).blob();
+        const dataUri = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+        frame.postMessage(JSON.stringify({ action: 'load', xml: dataUri }), '*');
+      } catch {
+        frame.postMessage(JSON.stringify({ action: 'load', xml: '' }), '*');
+      }
+    } else {
+      frame.postMessage(JSON.stringify({ action: 'load', xml: '' }), '*');
+    }
+  } else if (msg.event === 'save') {
+    frame.postMessage(JSON.stringify({ action: 'export', format: 'xmlsvg' }), '*');
+  } else if (msg.event === 'export') {
+    // 保存処理後(モーダルを閉じた後)に届く2通目以降のexportを無視する(画像の二重挿入防止)
+    if (!$('diagramModal').classList.contains('show')) return;
+    try {
+      const body = { name: 'drawio', dataUri: msg.data };
+      if (sess.mode === 'editImage') body.path = sess.path;
+      const { path } = await api('/api/asset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (sess.mode === 'editImage') {
+        editor.setMarkdown(editor.getMarkdown(), false);  // 上書き: 画像を再読み込み
+        toast('🖊 図を描き直しました');
+      } else if (sess.mode === 'convert') {
+        // Mermaidブロックを、変換して描いたdraw.io画像に置き換える
+        const md = editor.getMarkdown();
+        const blocks = getMermaidBlocks(md);
+        const blk = blocks[sess.blockIndex];
+        if (blk) {
+          const newMd = md.slice(0, blk.index) + `![図](${path})` + md.slice(blk.index + blk.full.length);
+          editor.setMarkdown(newMd, false);
+        } else {
+          editor.exec('addImage', { imageUrl: path, altText: '図' });
+        }
+        toast('🎨 draw.io図に変換しました。以後はマウスで編集できます');
+      } else {
+        editor.exec('addImage', { imageUrl: path, altText: '図' });
+        toast('🎨 描いた図を文書に挿入しました');
+      }
+      setDirty(true);
+    } catch (err) {
+      toast('図の保存に失敗しました: ' + err.message);
+    }
+    closeDiagramModal();
+    scheduleEditorDiagrams();
+  } else if (msg.event === 'exit') {
+    closeDiagramModal();
+  }
+});
+
+// ================= 改善要望 =================
+function openFeedback() { $('feedbackModal').classList.add('show'); $('fbText').focus(); }
+function closeFeedback() { $('feedbackModal').classList.remove('show'); }
+
+async function submitFeedback() {
+  const text = $('fbText').value;
+  if (!text.trim()) return toast('内容を書いてから「記録する」を押してください');
+  try {
+    await api('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: $('fbCategory').value, text }),
+    });
+    $('fbText').value = '';
+    closeFeedback();
+    toast('💬 feedback.md に記録しました。ありがとうございます！');
+    await loadFiles();  // 一覧にfeedback.mdを反映
+  } catch (e) {
+    toast('記録に失敗しました: ' + e.message);
+  }
+}
+
+// ================= 使い方 =================
+function openHelp() { $('helpModal').classList.add('show'); }
+function closeHelp() {
+  $('helpModal').classList.remove('show');
+  localStorage.setItem('mdpreview-help-seen', '1');
+}
+
+// ---------- イベント ----------
+$('btnEdit').onclick = () => setMode('edit');
+$('btnView').onclick = () => setMode('view');
+$('btnSave').onclick = saveFile;
+$('btnSnapshot').onclick = saveSnapshot;
+$('btnNewFile').onclick = newFile;
+$('btnReload').onclick = () => { $('searchBox').value = ''; loadFiles(); };
+$('searchBox').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(runSearch, 300);
+});
+$('btnHelp').onclick = openHelp;
+$('btnFeedback').onclick = openFeedback;
+$('btnFeedbackClose').onclick = closeFeedback;
+$('btnFeedbackCancel').onclick = closeFeedback;
+$('btnFeedbackSubmit').onclick = submitFeedback;
+// 比較用mdファイルの取り込み(ファイル選択後)
+$('importVersionInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f || !state.file) return;
+  try {
+    const text = await f.text();
+    const { id } = await api('/api/version-import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: state.file, label: '取り込み_' + f.name.replace(/\.\w+$/, ''), content: text }),
+    });
+    await loadVersions();
+    state.diffVersionId = id;
+    await refreshPane();
+    toast('📥 「' + f.name + '」を比較用バージョンとして取り込みました');
+  } catch (err) {
+    toast('取り込みに失敗しました: ' + err.message);
+  }
+});
+
+// draw.io図(assets/の画像)はダブルクリックでも再編集を開ける
+$('editor').addEventListener('dblclick', (e) => {
+  const img = e.target && e.target.closest ? e.target.closest('img') : null;
+  if (!img) return;
+  const src = (img.getAttribute('src') || '').replace(/^\//, '');
+  if (src.startsWith('assets/')) openDrawioEditor(src);
+});
+
+// 編集画面のスクロール・画面サイズ変更に図の位置を追従させる
+$('editorPane').addEventListener('scroll', () => { repositionEditorDiagrams(); updateTableTools(); }, true);
+window.addEventListener('resize', scheduleEditorDiagrams);
+// 画像のドラッグは複製などの誤操作になりやすいため無効化(移動は⬆⬇ボタンで)
+$('editor').addEventListener('dragstart', (e) => {
+  if (e.target && e.target.tagName === 'IMG') e.preventDefault();
+});
+$('btnStartNew').onclick = newFile;
+$('btnStartHelp').onclick = openHelp;
+$('btnHelpClose').onclick = closeHelp;
+$('btnHelpOk').onclick = closeHelp;
+$('tabMermaid').onclick = () => switchDiagramTab('mermaid');
+$('tabDrawio').onclick = () => switchDiagramTab('drawio');
+$('btnDiagramClose').onclick = closeDiagramModal;
+$('btnDiagramCancel').onclick = closeDiagramModal;
+$('btnDiagramInsert').onclick = insertMermaid;
+$('mmApplyTemplate').onclick = applyTemplate;
+$('mmTemplate').onchange = () => { $('mmHelp').innerHTML = MERMAID_TEMPLATES[$('mmTemplate').value].help; };
+$('mmCode').addEventListener('input', () => {
+  clearTimeout(mermaidRenderTimer);
+  mermaidRenderTimer = setTimeout(renderMermaidPreview, 400);
+});
+
+// アンドゥ/リドゥ時、エディタが編集箇所へ画面を大きくスクロールさせてしまう(標準挙動)。
+// 見ている場所が飛ぶと分かりにくいので、一定時間、元のスクロール位置に固定し続ける。
+// 連続アンドゥでもロックを延長し、最初に見ていた位置を保つ。
+let scrollLock = null;  // { top, until }
+function lockEditorScroll() {
+  const pm = document.querySelector('#editor .ProseMirror.toastui-editor-contents');
+  if (!pm) return;
+  if (scrollLock) { scrollLock.until = performance.now() + 300; return; }  // 延長のみ(元位置は保持)
+  scrollLock = { top: pm.scrollTop, until: performance.now() + 300 };
+  const tick = () => {
+    const el = document.querySelector('#editor .ProseMirror.toastui-editor-contents');
+    if (!el || !scrollLock) { scrollLock = null; return; }
+    if (Math.abs(el.scrollTop - scrollLock.top) > 2) el.scrollTop = scrollLock.top;  // rAF(描画前)なのでちらつかない
+    if (performance.now() < scrollLock.until) requestAnimationFrame(tick);
+    else scrollLock = null;
+  };
+  requestAnimationFrame(tick);
+}
+
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveFile(); }
+  if (e.key === 'Escape') { closeDiagramModal(); $('helpModal').classList.remove('show'); closeFeedback(); }
+  // アンドゥ(Ctrl+Z) / リドゥ(Ctrl+Y, Ctrl+Shift+Z)
+  if ((e.ctrlKey || e.metaKey) && ['z', 'y'].includes(e.key.toLowerCase())) {
+    if (state.mode === 'edit') lockEditorScroll();
+    // Windows流のCtrl+Yでもリドゥできるようにする(Toast UI標準はCtrl+Shift+Zのみ)
+    if (state.mode === 'edit' && !e.shiftKey && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      try { editor.exec('redo'); } catch {}
+    }
+  }
+}, true);
+window.addEventListener('beforeunload', (e) => { if (state.dirty) e.preventDefault(); });
+
+// ---------- 起動 ----------
+(async () => {
+  const files = await loadFiles();
+  renderHeader();
+  if (files.length) await openFile(files[0]);   // 最初のファイルを自動で開く
+  if (!localStorage.getItem('mdpreview-help-seen')) openHelp();  // 初回はガイドを表示
+})();
+</script>
+</body>
+</html>

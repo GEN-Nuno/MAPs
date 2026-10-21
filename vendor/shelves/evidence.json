@@ -1,0 +1,2272 @@
+{
+  "version": 2,
+  "name": "📸 証跡キャプチャ 設計",
+  "activeId": "l1-main",
+  "diagrams": [
+    {
+      "id": "l1-main",
+      "layer": "L1",
+      "title": "証跡キャプチャ 全体運用フロー",
+      "participants": [
+        {
+          "id": "p-user",
+          "name": "担当者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-app",
+          "name": "証跡キャプチャ",
+          "kind": "process"
+        },
+        {
+          "id": "p-win",
+          "name": "Windows (画面/ホットキー)",
+          "kind": "system"
+        },
+        {
+          "id": "p-xlsx",
+          "name": "証跡.xlsx",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-l1-1",
+          "kind": "message",
+          "fromId": "p-user",
+          "toId": "p-app",
+          "text": "起動して保存先ルートフォルダを指定",
+          "arrow": "sync",
+          "note": "保存先は QSettings に記憶し次回起動時に復元。ローカルアプリ 1 本で完結 (サーバ不要)"
+        },
+        {
+          "id": "m-l1-2",
+          "kind": "message",
+          "fromId": "p-app",
+          "toId": "p-win",
+          "text": "グローバルホットキーを登録 (既定 PrintScreen、変更可)",
+          "arrow": "sync",
+          "note": "起動中のみ RegisterHotKey で優先される。終了時に解除するので、起動していないときは OS 既定の動きに戻る"
+        },
+        {
+          "id": "m-l1-3",
+          "kind": "message",
+          "fromId": "p-user",
+          "toId": "p-app",
+          "text": "タイトルを入力",
+          "arrow": "sync",
+          "linkTargetId": "l2-title"
+        },
+        {
+          "id": "m-l1-4",
+          "kind": "message",
+          "fromId": "p-app",
+          "toId": "p-user",
+          "text": "点線の撮影フレームを最前面に表示。次の番号 (1 から) をフレームに表示",
+          "arrow": "reply",
+          "note": "枠と撮影ボタンだけが実体で、内側はクリック透過。下のアプリを普通に操作できる"
+        },
+        {
+          "id": "m-l1-5",
+          "kind": "message",
+          "fromId": "p-user",
+          "toId": "p-app",
+          "text": "点線フレームをドラッグで移動・端をつまんでリサイズ",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-l1-6",
+          "kind": "message",
+          "fromId": "p-user",
+          "toId": "p-app",
+          "text": "撮影 (フレームのボタン or ホットキー)",
+          "arrow": "sync",
+          "linkTargetId": "l2-capture"
+        },
+        {
+          "id": "m-l1-7",
+          "kind": "message",
+          "fromId": "p-app",
+          "toId": "p-user",
+          "text": "保存完了: フレームが一瞬光り、番号が +1 される (タイトル/連番.png)",
+          "arrow": "reply",
+          "note": "番号はタイトルを変えない限り 1,2,3… と継続する"
+        },
+        {
+          "id": "m-l1-7b",
+          "kind": "message",
+          "fromId": "p-user",
+          "toId": "p-app",
+          "text": "番号を指定して撮影 (枝番 5-1 や、6 だけ撮り直し)",
+          "arrow": "sync",
+          "linkTargetId": "l2-numspec"
+        },
+        {
+          "id": "m-l1-8",
+          "kind": "message",
+          "fromId": "p-user",
+          "toId": "p-app",
+          "text": "タイトルを変更 → 新しいフォルダが作られ番号は 1 に戻る",
+          "arrow": "sync",
+          "linkTargetId": "l2-title"
+        },
+        {
+          "id": "m-l1-9",
+          "kind": "message",
+          "fromId": "p-user",
+          "toId": "p-app",
+          "text": "既存と同名のタイトルを入力 → 撮り直し確認",
+          "arrow": "sync",
+          "linkTargetId": "l2-retake"
+        },
+        {
+          "id": "m-l1-10",
+          "kind": "message",
+          "fromId": "p-user",
+          "toId": "p-app",
+          "text": "Excel 出力",
+          "arrow": "sync",
+          "linkTargetId": "l2-excel"
+        },
+        {
+          "id": "m-l1-11",
+          "kind": "message",
+          "fromId": "p-app",
+          "toId": "p-xlsx",
+          "text": "タイトルフォルダごとにシートを作り、連番順に画像を貼付",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-l1-r1",
+          "kind": "message",
+          "fromId": "p-app",
+          "toId": "p-user",
+          "text": "完了: 画面内ステータスで通知 (チャネルは 1 系統)",
+          "arrow": "reply"
+        },
+        {
+          "id": "m-l1-r2",
+          "kind": "message",
+          "fromId": "p-app",
+          "toId": "p-user",
+          "text": "失敗: 処理名をタイトルにしたダイアログ (保存失敗・Excel ロック中など)",
+          "arrow": "lost"
+        }
+      ],
+      "requirementId": "rq-evidence"
+    },
+    {
+      "id": "l2-title",
+      "layer": "L2",
+      "title": "タイトル入力とフォルダ・連番の決定",
+      "parentId": "l1-main",
+      "ticketId": "t-core",
+      "participants": [
+        {
+          "id": "p-ti-user",
+          "name": "担当者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-ti-main",
+          "name": "MainWindow",
+          "kind": "class"
+        },
+        {
+          "id": "p-ti-ctrl",
+          "name": "AppController",
+          "kind": "class"
+        },
+        {
+          "id": "p-ti-naming",
+          "name": "NamingService (純ロジック)",
+          "kind": "class"
+        },
+        {
+          "id": "p-ti-fs",
+          "name": "ファイルシステム",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-ti-1",
+          "kind": "message",
+          "fromId": "p-ti-user",
+          "toId": "p-ti-main",
+          "text": "タイトルを入力して確定",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-ti-2",
+          "kind": "message",
+          "fromId": "p-ti-main",
+          "toId": "p-ti-ctrl",
+          "text": "set_title(title)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-ti-3",
+          "kind": "message",
+          "fromId": "p-ti-ctrl",
+          "toId": "p-ti-naming",
+          "text": "フォルダ名にできない文字を除去 (\\ / : * ? \" < > |)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b-ti-exists",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-ti-new",
+              "label": "新規タイトル (フォルダなし)",
+              "items": [
+                {
+                  "id": "m-ti-4",
+                  "kind": "message",
+                  "fromId": "p-ti-ctrl",
+                  "toId": "p-ti-fs",
+                  "text": "<保存先>/<タイトル>/ を作成 (OSError は「フォルダ作成に失敗」ダイアログで捕捉)",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-ti-5",
+                  "kind": "message",
+                  "fromId": "p-ti-ctrl",
+                  "toId": "p-ti-user",
+                  "text": "次の番号 = 1 をフレームに表示",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-ti-same",
+              "label": "既存タイトル (同名フォルダあり)",
+              "items": [
+                {
+                  "id": "m-ti-6",
+                  "kind": "message",
+                  "fromId": "p-ti-ctrl",
+                  "toId": "p-ti-user",
+                  "text": "確認ダイアログ「同名の証跡があります。撮り直しますか？」",
+                  "arrow": "reply",
+                  "linkTargetId": "l2-retake"
+                },
+                {
+                  "id": "b-ti-answer",
+                  "kind": "block",
+                  "blockKind": "alt",
+                  "branches": [
+                    {
+                      "id": "br-ti-retake",
+                      "label": "はい (撮り直し)",
+                      "items": [
+                        {
+                          "id": "m-ti-7",
+                          "kind": "message",
+                          "fromId": "p-ti-ctrl",
+                          "toId": "p-ti-user",
+                          "text": "撮り直しモードへ。1 番から順に差し替え (前回範囲をガイド表示)",
+                          "arrow": "reply"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "br-ti-append",
+                      "label": "いいえ (続きから撮る)",
+                      "items": [
+                        {
+                          "id": "m-ti-8",
+                          "kind": "message",
+                          "fromId": "p-ti-ctrl",
+                          "toId": "p-ti-user",
+                          "text": "既存の最大番号 +1 から継続",
+                          "arrow": "reply"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l2-capture",
+      "layer": "L2",
+      "title": "撮影フレームとキャプチャ実行",
+      "parentId": "l1-main",
+      "ticketId": "t-core",
+      "participants": [
+        {
+          "id": "p-cp-user",
+          "name": "担当者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-cp-frame",
+          "name": "CaptureFrame (点線オーバーレイ)",
+          "kind": "class"
+        },
+        {
+          "id": "p-cp-hot",
+          "name": "HotkeyService",
+          "kind": "class"
+        },
+        {
+          "id": "p-cp-ctrl",
+          "name": "AppController",
+          "kind": "class"
+        },
+        {
+          "id": "p-cp-cap",
+          "name": "CaptureService",
+          "kind": "class"
+        },
+        {
+          "id": "p-cp-fs",
+          "name": "ファイルシステム",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "b-cp-trigger",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-cp-btn",
+              "label": "フレーム脇の撮影ボタン",
+              "items": [
+                {
+                  "id": "m-cp-1",
+                  "kind": "message",
+                  "fromId": "p-cp-user",
+                  "toId": "p-cp-frame",
+                  "text": "撮影ボタンをクリック",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "br-cp-hot",
+              "label": "グローバルホットキー",
+              "items": [
+                {
+                  "id": "m-cp-2",
+                  "kind": "message",
+                  "fromId": "p-cp-user",
+                  "toId": "p-cp-hot",
+                  "text": "設定キーを押す (他アプリ操作中でも届く)",
+                  "arrow": "sync",
+                  "note": "WM_HOTKEY を nativeEventFilter で受ける。起動中だけ OS より優先"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m-cp-3",
+          "kind": "message",
+          "fromId": "p-cp-frame",
+          "toId": "p-cp-ctrl",
+          "text": "capture_requested(点線内側の矩形)",
+          "arrow": "sync",
+          "note": "枠線・番号・ボタンは矩形の外側に描くので証跡には写らない"
+        },
+        {
+          "id": "m-cp-4",
+          "kind": "message",
+          "fromId": "p-cp-ctrl",
+          "toId": "p-cp-cap",
+          "text": "grab_region(rect) — QScreen.grabWindow",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-cp-5",
+          "kind": "message",
+          "fromId": "p-cp-cap",
+          "toId": "p-cp-fs",
+          "text": "<保存先>/<タイトル>/<連番>_<撮影日時>.png へ保存 + region.json に矩形を追記",
+          "arrow": "sync",
+          "note": "region.json は撮り直し時に前回範囲を出すための正本。ファイル名は「3_20260810_153045.png」形式で、いつ撮ったかが名前だけで分かる。旧形式「3.png」も連番として読める (後方互換)"
+        },
+        {
+          "id": "b-cp-result",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-cp-ok",
+              "label": "保存成功",
+              "items": [
+                {
+                  "id": "m-cp-6",
+                  "kind": "message",
+                  "fromId": "p-cp-ctrl",
+                  "toId": "p-cp-user",
+                  "text": "フレームを一瞬フラッシュし、番号表示を +1",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-cp-ng",
+              "label": "保存失敗 (書込不可など)",
+              "items": [
+                {
+                  "id": "m-cp-7",
+                  "kind": "message",
+                  "fromId": "p-cp-ctrl",
+                  "toId": "p-cp-user",
+                  "text": "「証跡の保存に失敗」ダイアログ。番号は進めない",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l2-retake",
+      "layer": "L2",
+      "title": "同名タイトルの撮り直し (前回範囲ガイドつき)",
+      "parentId": "l1-main",
+      "ticketId": "t-retake",
+      "participants": [
+        {
+          "id": "p-rt-user",
+          "name": "担当者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-rt-frame",
+          "name": "CaptureFrame",
+          "kind": "class"
+        },
+        {
+          "id": "p-rt-ctrl",
+          "name": "AppController",
+          "kind": "class"
+        },
+        {
+          "id": "p-rt-store",
+          "name": "RegionStore (region.json)",
+          "kind": "class"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-rt-1",
+          "kind": "message",
+          "fromId": "p-rt-ctrl",
+          "toId": "p-rt-store",
+          "text": "前回の撮影範囲一覧を読込 (数値でない値・型不正のエントリは黙って捨てる)",
+          "arrow": "sync",
+          "note": "セキュリティレビュー (2026-08-10): 手編集や破損で数値以外が入ると int() が未捕捉 ValueError で落ちていた。エントリ単位で検証し、壊れた分だけ無視する"
+        },
+        {
+          "id": "m-rt-2",
+          "kind": "message",
+          "fromId": "p-rt-ctrl",
+          "toId": "p-rt-user",
+          "text": "「#1 はこの範囲で撮ってください」— 前回範囲を別色の点線ガイドで表示し、フレームをその位置へスナップ",
+          "arrow": "reply",
+          "note": "ガイドはあくまで指示。担当者はフレームを自由に動かして違う範囲でも撮れる"
+        },
+        {
+          "id": "m-rt-3",
+          "kind": "message",
+          "fromId": "p-rt-user",
+          "toId": "p-rt-frame",
+          "text": "撮影 (ボタン or ホットキー)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-rt-4",
+          "kind": "message",
+          "fromId": "p-rt-ctrl",
+          "toId": "p-rt-store",
+          "text": "新しい日時付きファイルを保存してから、同じ連番の旧ファイルを削除。region.json の該当矩形を更新",
+          "arrow": "sync",
+          "note": "差し替えは撮影成功時のみ。失敗したら旧画像を残す (先に保存 → 成功後に旧を削除、の順で安全にする)"
+        },
+        {
+          "id": "b-rt-next",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-rt-more",
+              "label": "まだ差し替える番号が残っている",
+              "items": [
+                {
+                  "id": "m-rt-5",
+                  "kind": "message",
+                  "fromId": "p-rt-ctrl",
+                  "toId": "p-rt-user",
+                  "text": "次の番号のガイドを表示して継続",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-rt-done",
+              "label": "全番号を差し替えた",
+              "items": [
+                {
+                  "id": "m-rt-6",
+                  "kind": "message",
+                  "fromId": "p-rt-ctrl",
+                  "toId": "p-rt-user",
+                  "text": "「撮り直し完了」ステータス表示 → 通常モードへ (続けて撮ると追加番号)",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l2-excel",
+      "layer": "L2",
+      "title": "Excel 出力 (タイトルごとのシートに画像貼付)",
+      "parentId": "l1-main",
+      "ticketId": "t-excel",
+      "participants": [
+        {
+          "id": "p-xl-user",
+          "name": "担当者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-xl-main",
+          "name": "MainWindow",
+          "kind": "class"
+        },
+        {
+          "id": "p-xl-svc",
+          "name": "ExcelService (openpyxl)",
+          "kind": "class"
+        },
+        {
+          "id": "p-xl-fs",
+          "name": "証跡.xlsx",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-xl-1",
+          "kind": "message",
+          "fromId": "p-xl-user",
+          "toId": "p-xl-main",
+          "text": "「Excel 出力」を押す",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-xl-2",
+          "kind": "message",
+          "fromId": "p-xl-main",
+          "toId": "p-xl-svc",
+          "text": "export(保存先ルート)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-xl-3",
+          "kind": "message",
+          "fromId": "p-xl-svc",
+          "toId": "p-xl-fs",
+          "text": "タイトルフォルダごとにシートを作成し、連番順に A列=番号 B列=撮影時刻 C列=画像 を行方向へ貼付",
+          "arrow": "sync",
+          "note": "毎回作り直し (フォルダの中身が正本)。行の高さは画像に合わせる"
+        },
+        {
+          "id": "b-xl-result",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-xl-ok",
+              "label": "書き込み成功",
+              "items": [
+                {
+                  "id": "m-xl-4",
+                  "kind": "message",
+                  "fromId": "p-xl-svc",
+                  "toId": "p-xl-user",
+                  "text": "「Excel 出力完了」ステータス + ファイルを開くボタン",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-xl-locked",
+              "label": "証跡.xlsx が Excel で開かれていてロック中",
+              "items": [
+                {
+                  "id": "m-xl-5",
+                  "kind": "message",
+                  "fromId": "p-xl-svc",
+                  "toId": "p-xl-user",
+                  "text": "「Excel 出力失敗: ファイルを閉じてから再実行してください」ダイアログ",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l2-hotkey",
+      "layer": "L2",
+      "title": "グローバルホットキーの登録と解除",
+      "parentId": "l1-main",
+      "ticketId": "t-hotkey",
+      "participants": [
+        {
+          "id": "p-hk-user",
+          "name": "担当者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-hk-app",
+          "name": "AppController",
+          "kind": "class"
+        },
+        {
+          "id": "p-hk-svc",
+          "name": "HotkeyService",
+          "kind": "class"
+        },
+        {
+          "id": "p-hk-os",
+          "name": "Windows (user32)",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-hk-1",
+          "kind": "message",
+          "fromId": "p-hk-app",
+          "toId": "p-hk-svc",
+          "text": "起動時: register(設定キー — 既定 PrintScreen)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-hk-2",
+          "kind": "message",
+          "fromId": "p-hk-svc",
+          "toId": "p-hk-os",
+          "text": "RegisterHotKey(hwnd, id, mod, vk)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b-hk-reg",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-hk-ok",
+              "label": "登録成功",
+              "items": [
+                {
+                  "id": "m-hk-3",
+                  "kind": "message",
+                  "fromId": "p-hk-user",
+                  "toId": "p-hk-os",
+                  "text": "他アプリ操作中に設定キーを押す",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-hk-4",
+                  "kind": "message",
+                  "fromId": "p-hk-os",
+                  "toId": "p-hk-svc",
+                  "text": "WM_HOTKEY (nativeEventFilter で受信)",
+                  "arrow": "async"
+                },
+                {
+                  "id": "m-hk-5",
+                  "kind": "message",
+                  "fromId": "p-hk-svc",
+                  "toId": "p-hk-app",
+                  "text": "triggered シグナル → 撮影実行",
+                  "arrow": "async",
+                  "linkTargetId": "l2-capture"
+                }
+              ]
+            },
+            {
+              "id": "br-hk-ng",
+              "label": "登録失敗 (他アプリが使用中)",
+              "items": [
+                {
+                  "id": "m-hk-6",
+                  "kind": "message",
+                  "fromId": "p-hk-svc",
+                  "toId": "p-hk-user",
+                  "text": "「ホットキー登録に失敗」警告。ボタン撮影は使える",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m-hk-7",
+          "kind": "message",
+          "fromId": "p-hk-app",
+          "toId": "p-hk-svc",
+          "text": "終了時: unregister()",
+          "arrow": "sync",
+          "note": "解除するので非起動時は OS 既定の動作。仕様「起動していないときは優先されない」の実体"
+        },
+        {
+          "id": "m-hk-8",
+          "kind": "message",
+          "fromId": "p-hk-svc",
+          "toId": "p-hk-os",
+          "text": "UnregisterHotKey(hwnd, id)",
+          "arrow": "sync"
+        }
+      ]
+    },
+    {
+      "id": "l2-numspec",
+      "layer": "L2",
+      "title": "番号指定: 枝番 (5-1) と特定番号だけの撮り直し",
+      "parentId": "l1-main",
+      "ticketId": "t-numspec",
+      "participants": [
+        {
+          "id": "p-ns-user",
+          "name": "担当者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-ns-main",
+          "name": "MainWindow",
+          "kind": "class"
+        },
+        {
+          "id": "p-ns-ctrl",
+          "name": "AppController",
+          "kind": "class"
+        },
+        {
+          "id": "p-ns-naming",
+          "name": "NamingService",
+          "kind": "class"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-ns-1",
+          "kind": "message",
+          "fromId": "p-ns-user",
+          "toId": "p-ns-main",
+          "text": "番号欄に「5-1」や「6」を入力して変更",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-ns-2",
+          "kind": "message",
+          "fromId": "p-ns-main",
+          "toId": "p-ns-ctrl",
+          "text": "number_committed(text)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-ns-2b",
+          "kind": "message",
+          "fromId": "p-ns-ctrl",
+          "toId": "p-ns-naming",
+          "text": "parse_number_input(text) と既存ファイルの有無を確認",
+          "arrow": "sync",
+          "linkTargetId": "l3-numspec"
+        },
+        {
+          "id": "b-ns-parse",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-ns-invalid",
+              "label": "形式が不正 (数字 または 数字-数字 でない)",
+              "items": [
+                {
+                  "id": "m-ns-3",
+                  "kind": "message",
+                  "fromId": "p-ns-ctrl",
+                  "toId": "p-ns-user",
+                  "text": "「番号は 6 か 5-1 の形式で入力してください」ステータス表示",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-ns-new",
+              "label": "未使用の番号",
+              "items": [
+                {
+                  "id": "m-ns-4",
+                  "kind": "message",
+                  "fromId": "p-ns-ctrl",
+                  "toId": "p-ns-user",
+                  "text": "次の番号を指定値に変更 (「次は #5-1」)。撮影後は 5-2, 5-3 と枝番が継続",
+                  "arrow": "reply",
+                  "note": "枝番なし (6) を指定した場合、撮影後は 7, 8 と通常の連番が継続する"
+                }
+              ]
+            },
+            {
+              "id": "br-ns-exists",
+              "label": "既存の番号",
+              "items": [
+                {
+                  "id": "m-ns-5",
+                  "kind": "message",
+                  "fromId": "p-ns-ctrl",
+                  "toId": "p-ns-user",
+                  "text": "確認「#6 は撮影済みです。撮り直しますか？」",
+                  "arrow": "reply"
+                },
+                {
+                  "id": "b-ns-answer",
+                  "kind": "block",
+                  "blockKind": "alt",
+                  "branches": [
+                    {
+                      "id": "br-ns-yes",
+                      "label": "はい",
+                      "items": [
+                        {
+                          "id": "m-ns-6",
+                          "kind": "message",
+                          "fromId": "p-ns-ctrl",
+                          "toId": "p-ns-user",
+                          "text": "その 1 件だけの撮り直しモードへ。前回範囲をガイド表示 (全件撮り直しと同じ仕組み)",
+                          "arrow": "reply",
+                          "linkTargetId": "l2-retake"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "br-ns-no",
+                      "label": "いいえ",
+                      "items": [
+                        {
+                          "id": "m-ns-7",
+                          "kind": "message",
+                          "fromId": "p-ns-ctrl",
+                          "toId": "p-ns-user",
+                          "text": "何も変えない",
+                          "arrow": "reply"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l3-numspec",
+      "layer": "L3",
+      "title": "番号の解析と後続番号 (純ロジック)",
+      "parentId": "l2-numspec",
+      "ticketId": "t-numspec",
+      "participants": [
+        {
+          "id": "p-nq-ctrl",
+          "name": "AppController",
+          "kind": "class"
+        },
+        {
+          "id": "p-nq-parse",
+          "name": "parse_number_input()",
+          "kind": "function"
+        },
+        {
+          "id": "p-nq-succ",
+          "name": "successor()",
+          "kind": "function"
+        },
+        {
+          "id": "p-nq-shots",
+          "name": "shots_for_number()",
+          "kind": "function"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-nq-1",
+          "kind": "message",
+          "fromId": "p-nq-ctrl",
+          "toId": "p-nq-parse",
+          "text": "parse_number_input(\"5-1\") → (5,1) / \"6\" → (6,0) / 不正・0 始まりの枝番なしは None",
+          "arrow": "sync",
+          "note": "番号は (本番号, 枝番) のタプル。枝番 0 = 枝番なし。ファイル名は 5-1_20260810_153045.png"
+        },
+        {
+          "id": "b-nq-exists",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-nq-free",
+              "label": "shots_for_number() が空 (未使用)",
+              "items": [
+                {
+                  "id": "m-nq-2",
+                  "kind": "message",
+                  "fromId": "p-nq-shots",
+                  "toId": "p-nq-ctrl",
+                  "text": "next_number = 指定値",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-nq-used",
+              "label": "既存ファイルあり",
+              "items": [
+                {
+                  "id": "m-nq-3",
+                  "kind": "message",
+                  "fromId": "p-nq-shots",
+                  "toId": "p-nq-ctrl",
+                  "text": "撮り直し確認へ (差し替え時は同番号の旧ファイルを削除)",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m-nq-4",
+          "kind": "message",
+          "fromId": "p-nq-ctrl",
+          "toId": "p-nq-succ",
+          "text": "撮影成功後: successor((5,1)) → (5,2) / successor((6,0)) → (7,0)",
+          "arrow": "sync",
+          "note": "枝番を撮っている間は枝番が進み、枝番なしに戻すのは番号欄で指定し直す"
+        }
+      ]
+    },
+    {
+      "id": "l3-hotkey",
+      "layer": "L3",
+      "title": "HotkeyService: Win32 API の呼び出し詳細",
+      "parentId": "l2-hotkey",
+      "ticketId": "t-hotkey",
+      "participants": [
+        {
+          "id": "p-hs-svc",
+          "name": "HotkeyService",
+          "kind": "class"
+        },
+        {
+          "id": "p-hs-reg",
+          "name": "register()",
+          "kind": "function"
+        },
+        {
+          "id": "p-hs-filter",
+          "name": "nativeEventFilter()",
+          "kind": "function"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-hs-1",
+          "kind": "message",
+          "fromId": "p-hs-svc",
+          "toId": "p-hs-reg",
+          "text": "register(mod, vk) — ctypes.windll.user32.RegisterHotKey(None, HOTKEY_ID, mod, vk)",
+          "arrow": "sync",
+          "note": "hwnd=None でスレッドメッセージとして受ける。既定は mod=0, vk=VK_SNAPSHOT (PrintScreen)"
+        },
+        {
+          "id": "b-hs-ret",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-hs-ok",
+              "label": "戻り値 True",
+              "items": [
+                {
+                  "id": "m-hs-2",
+                  "kind": "message",
+                  "fromId": "p-hs-filter",
+                  "toId": "p-hs-svc",
+                  "text": "MSG.message == WM_HOTKEY で triggered.emit()",
+                  "arrow": "async",
+                  "note": "QAbstractNativeEventFilter を QApplication に installNativeEventFilter"
+                }
+              ]
+            },
+            {
+              "id": "br-hs-ng",
+              "label": "戻り値 False (他アプリが使用中)",
+              "items": [
+                {
+                  "id": "m-hs-3",
+                  "kind": "message",
+                  "fromId": "p-hs-reg",
+                  "toId": "p-hs-svc",
+                  "text": "registered=False → 起動時に警告表示へ",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l3-naming",
+      "layer": "L3",
+      "title": "NamingService: タイトル正規化と連番決定 (純ロジック)",
+      "parentId": "l2-title",
+      "ticketId": "t-core",
+      "participants": [
+        {
+          "id": "p-nm-ctrl",
+          "name": "AppController",
+          "kind": "class"
+        },
+        {
+          "id": "p-nm-san",
+          "name": "sanitize_title()",
+          "kind": "function"
+        },
+        {
+          "id": "p-nm-next",
+          "name": "next_index()",
+          "kind": "function"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-nm-1",
+          "kind": "message",
+          "fromId": "p-nm-ctrl",
+          "toId": "p-nm-san",
+          "text": "sanitize_title(title) — 禁止文字除去・前後の空白とドット除去・60文字に制限・Windows 予約名 (CON/NUL/COM1 等) は拒否",
+          "arrow": "sync",
+          "note": "セキュリティレビュー (2026-08-10) で強化: 末尾スペースが残ると Windows でフォルダは作れるのに書き込みが ENOENT になる (実測)。長すぎる名前は mkdir が WinError 3 になるため 60 文字で切る"
+        },
+        {
+          "id": "b-nm-empty",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-nm-ok",
+              "label": "有効な名前が残る",
+              "items": [
+                {
+                  "id": "m-nm-2",
+                  "kind": "message",
+                  "fromId": "p-nm-san",
+                  "toId": "p-nm-ctrl",
+                  "text": "正規化済みタイトル",
+                  "arrow": "reply"
+                },
+                {
+                  "id": "m-nm-3",
+                  "kind": "message",
+                  "fromId": "p-nm-ctrl",
+                  "toId": "p-nm-next",
+                  "text": "next_index(フォルダ内の *.png 一覧) — parse_index() が「3_20260810_153045.png」と旧「3.png」の両方から連番を取り出す",
+                  "arrow": "sync",
+                  "note": "既存連番の最大値 +1。空なら 1。連番と読めない名前は無視。保存名は shot_filename(連番, 撮影日時) が作る"
+                },
+                {
+                  "id": "m-nm-4",
+                  "kind": "message",
+                  "fromId": "p-nm-next",
+                  "toId": "p-nm-ctrl",
+                  "text": "次の連番",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-nm-empty",
+              "label": "空になった",
+              "items": [
+                {
+                  "id": "m-nm-5",
+                  "kind": "message",
+                  "fromId": "p-nm-san",
+                  "toId": "p-nm-ctrl",
+                  "text": "None → 確定を拒否しエラー表示",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l3-frame",
+      "layer": "L3",
+      "title": "CaptureFrame: マスクによるクリック透過と撮影矩形",
+      "parentId": "l2-capture",
+      "ticketId": "t-core",
+      "participants": [
+        {
+          "id": "p-fr-frame",
+          "name": "CaptureFrame",
+          "kind": "class"
+        },
+        {
+          "id": "p-fr-mask",
+          "name": "_update_mask()",
+          "kind": "function"
+        },
+        {
+          "id": "p-fr-rect",
+          "name": "capture_rect()",
+          "kind": "function"
+        },
+        {
+          "id": "p-fr-cap",
+          "name": "CaptureService.grab_region()",
+          "kind": "function"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-fr-1",
+          "kind": "message",
+          "fromId": "p-fr-frame",
+          "toId": "p-fr-mask",
+          "text": "resizeEvent / moveEvent のたびに setMask(枠+ボタン帯のみ)",
+          "arrow": "sync",
+          "note": "マスク外 (内側) はクリックが下のアプリへ抜ける。WindowStaysOnTopHint + FramelessWindowHint"
+        },
+        {
+          "id": "m-fr-2",
+          "kind": "message",
+          "fromId": "p-fr-frame",
+          "toId": "p-fr-rect",
+          "text": "capture_rect() — 点線の内側をスクリーン座標で返す",
+          "arrow": "sync",
+          "note": "枠線ぶんを差し引くので点線・番号・ボタンは証跡に写らない"
+        },
+        {
+          "id": "m-fr-3",
+          "kind": "message",
+          "fromId": "p-fr-rect",
+          "toId": "p-fr-cap",
+          "text": "grab_region(rect) — QScreen.grabWindow(0, x, y, w, h)",
+          "arrow": "sync",
+          "note": "高 DPI ではデバイスピクセル比を掛けて実ピクセルで切り出す"
+        },
+        {
+          "id": "m-fr-4",
+          "kind": "message",
+          "fromId": "p-fr-cap",
+          "toId": "p-fr-frame",
+          "text": "QPixmap → PNG 保存後にフラッシュ表示",
+          "arrow": "reply",
+          "note": "as-built: 保存画像をピクセル確認し、点線・上部バー・ボタンが写らないことを実測。マスクは resizeEvent のたびに再適用が必要"
+        }
+      ]
+    },
+    {
+      "id": "l3-retake",
+      "layer": "L3",
+      "title": "RetakeSession: 差し替えの進行管理 (純ロジック)",
+      "parentId": "l2-retake",
+      "ticketId": "t-retake",
+      "participants": [
+        {
+          "id": "p-rs-ctrl",
+          "name": "AppController",
+          "kind": "class"
+        },
+        {
+          "id": "p-rs-sess",
+          "name": "RetakeSession",
+          "kind": "class"
+        },
+        {
+          "id": "p-rs-store",
+          "name": "RegionStore",
+          "kind": "class"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-rs-1",
+          "kind": "message",
+          "fromId": "p-rs-ctrl",
+          "toId": "p-rs-store",
+          "text": "load(フォルダ) → {連番: 矩形} を取得",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-rs-2",
+          "kind": "message",
+          "fromId": "p-rs-ctrl",
+          "toId": "p-rs-sess",
+          "text": "start(既存連番リスト) — current=先頭",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-rs-3",
+          "kind": "message",
+          "fromId": "p-rs-sess",
+          "toId": "p-rs-ctrl",
+          "text": "current の前回矩形 → ガイド表示とスナップに使う",
+          "arrow": "reply",
+          "note": "region.json に矩形が無い古いフォルダでは、ガイドなしで番号だけ指示する"
+        },
+        {
+          "id": "m-rs-4",
+          "kind": "message",
+          "fromId": "p-rs-ctrl",
+          "toId": "p-rs-sess",
+          "text": "撮影成功のたびに advance()",
+          "arrow": "sync"
+        },
+        {
+          "id": "b-rs-end",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-rs-more",
+              "label": "残りあり",
+              "items": [
+                {
+                  "id": "m-rs-5",
+                  "kind": "message",
+                  "fromId": "p-rs-sess",
+                  "toId": "p-rs-ctrl",
+                  "text": "次の連番と矩形",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-rs-done",
+              "label": "残りなし",
+              "items": [
+                {
+                  "id": "m-rs-6",
+                  "kind": "message",
+                  "fromId": "p-rs-sess",
+                  "toId": "p-rs-ctrl",
+                  "text": "finished=True → 通常モードへ復帰",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l3-excel",
+      "layer": "L3",
+      "title": "ExcelService.export: シート構築の詳細",
+      "parentId": "l2-excel",
+      "ticketId": "t-excel",
+      "participants": [
+        {
+          "id": "p-xs-svc",
+          "name": "ExcelService",
+          "kind": "class"
+        },
+        {
+          "id": "p-xs-scan",
+          "name": "scan_titles()",
+          "kind": "function"
+        },
+        {
+          "id": "p-xs-build",
+          "name": "build_workbook()",
+          "kind": "function"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-xs-1",
+          "kind": "message",
+          "fromId": "p-xs-svc",
+          "toId": "p-xs-scan",
+          "text": "scan_titles(ルート) — サブフォルダと連番 PNG を列挙 (純ロジック)",
+          "arrow": "sync",
+          "note": "parse_index() で連番と読める PNG のみ対象 (日時付き・旧形式の両方)。region.json は列挙から除外"
+        },
+        {
+          "id": "m-xs-2",
+          "kind": "message",
+          "fromId": "p-xs-scan",
+          "toId": "p-xs-svc",
+          "text": "[(タイトル, [(番号, パス, 更新時刻)])] を番号順で",
+          "arrow": "reply"
+        },
+        {
+          "id": "m-xs-3",
+          "kind": "message",
+          "fromId": "p-xs-svc",
+          "toId": "p-xs-build",
+          "text": "build_workbook(一覧) — シート名はタイトル (31 文字制限・重複は連番付与)",
+          "arrow": "sync",
+          "note": "画像 1 枚 = 1 ブロック行。行高を画像高 (px→pt 換算) に合わせる"
+        },
+        {
+          "id": "b-xs-save",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-xs-ok",
+              "label": "save 成功",
+              "items": [
+                {
+                  "id": "m-xs-4",
+                  "kind": "message",
+                  "fromId": "p-xs-build",
+                  "toId": "p-xs-svc",
+                  "text": "保存パスを返す",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-xs-err",
+              "label": "PermissionError (ロック中)",
+              "items": [
+                {
+                  "id": "m-xs-5",
+                  "kind": "message",
+                  "fromId": "p-xs-build",
+                  "toId": "p-xs-svc",
+                  "text": "例外 → 呼び出し元で失敗ダイアログ",
+                  "arrow": "reply",
+                  "note": "as-built: Python の open() は共有ロックを掛けないので試験でロックを再現できない。Excel 同等の CreateFileW(dwShareMode=0) を ctypes で呼んで再現した (実測で判明)"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "tickets": [
+    {
+      "id": "t-core",
+      "key": "S-1",
+      "title": "コア撮影: 点線フレーム・連番保存・タイトルフォルダ",
+      "description": "最前面の点線フレーム (内側クリック透過・移動リサイズ可) から範囲を撮影し、<保存先>/<タイトル>/<連番>.png へ保存。タイトル変更でフォルダ新設・番号 1 リセット。region.json に撮影矩形を記録。ファイル名は <連番>_<撮影日時>.png で、いつ撮ったかが名前で分かる (旧形式 <連番>.png も読める)。PySide6 (moviAI と同スタック)。\n\n残っていた実機確認 (2026-10-05): Win32 API で確認し pass (試験項目の結果メモ参照)。\n\n追記 (基底、2026-10-12): 証跡キャプチャの基底を書いた (段階 4: 初回セットアップ / 撮影の日常 / 設定 / 終了、画面 5、クラス 11 (純ロジックの関数は実シグネチャ)、引き継ぎ 2 (root_dir: Path、hotkey: str)、要件 1 を l1-main に)。moviAI に続く 2 例目で、型はそのまま使えた。地図の大きさは撮影で実測して S-36 の as-built と比べる。",
+      "priority": "high",
+      "stages": {
+        "design": "done",
+        "build": "done",
+        "test": "done",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "done"
+      }
+    },
+    {
+      "id": "t-numspec",
+      "key": "S-5",
+      "title": "番号指定: 枝番 (5-1) と特定番号だけの撮り直し",
+      "description": "番号欄に「5-1」や「6」を指定して撮影できる。未使用番号なら次の番号がそこへ移り、枝番は 5-2, 5-3 と継続。既存番号なら確認の上でその 1 件だけを前回範囲ガイドつきで撮り直す。ファイル名・region.json・Excel も枝番対応。全角数字入力は半角に正規化。",
+      "priority": "normal",
+      "stages": {
+        "design": "done",
+        "build": "done",
+        "test": "done",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "done"
+      }
+    },
+    {
+      "id": "t-retake",
+      "key": "S-2",
+      "title": "撮り直し: 同名タイトル確認と前回範囲ガイド",
+      "description": "同名タイトル入力時に確認ダイアログ。撮り直しでは 1 番から順に差し替え、region.json の前回矩形を別色点線ガイドで表示しフレームをスナップ。いいえなら続き番号で追記。",
+      "priority": "high",
+      "stages": {
+        "design": "done",
+        "build": "done",
+        "test": "done",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "done"
+      }
+    },
+    {
+      "id": "t-excel",
+      "key": "S-3",
+      "title": "Excel 出力: タイトルごとのシートに画像を行方向貼付",
+      "description": "openpyxl で <保存先>/証跡.xlsx を毎回作り直す。タイトルフォルダ = シート、連番順に番号・撮影時刻・画像を行方向に貼付。ロック中は処理名つきダイアログで失敗を伝える。",
+      "priority": "normal",
+      "stages": {
+        "design": "done",
+        "build": "done",
+        "test": "done",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "done"
+      }
+    },
+    {
+      "id": "t-hotkey",
+      "key": "S-4",
+      "title": "グローバルホットキー: 起動中のみ優先",
+      "description": "RegisterHotKey (Win32) で設定キー (既定 PrintScreen) を起動中だけ横取りし撮影を発火。設定画面で変更可。終了時に UnregisterHotKey するため、非起動時は OS 既定の動作に戻る。登録失敗 (他アプリが使用中) は起動時に警告。\n\n残っていた実機確認 (2026-10-05): Win32 API で確認し pass (試験項目の結果メモ参照)。",
+      "priority": "normal",
+      "stages": {
+        "design": "done",
+        "build": "done",
+        "test": "done",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "done"
+      }
+    }
+  ],
+  "comments": [],
+  "history": [],
+  "snapshots": [],
+  "testItems": [
+    {
+      "id": "ti-naming-seq",
+      "diagramId": "l2-title",
+      "ticketId": "t-core",
+      "category": "normal",
+      "title": "連番の決定 (新規 1 開始・継続・タイトル変更でリセット)",
+      "condition": "新規タイトル→3枚撮影→別タイトル→2枚→元のタイトルに戻し「いいえ」",
+      "expected": "1..3 / 1..2 と採番され、戻ったときは 4 から継続する",
+      "result": "pass",
+      "resultNote": "2026-08-10 pytest (test_naming) + 実機ドライバで 1..2/1/撮り直し後の継続を実測",
+      "draft": false
+    },
+    {
+      "id": "ti-numspec",
+      "diagramId": "l2-numspec",
+      "ticketId": "t-numspec",
+      "category": "state",
+      "title": "番号指定: 枝番の継続・未使用番号への移動・1件だけの撮り直し",
+      "condition": "1-1 を指定して撮影 → 6 を指定して撮影 → 撮影済みの 6 を指定して確認 Yes → 撮影。不正入力 (abc / 5-0 / 0)",
+      "expected": "1-1 の後は 1-2、6 の後は 7 に進む。撮影済み番号は 1 件だけ前回範囲ガイドつきで差し替えられ、完了後は最大番号+1 に戻る。不正入力はステータスで拒否",
+      "result": "pass",
+      "resultNote": "2026-08-11 pytest 41 件 (parse_number_input/successor/枝番ソート/region.json 枝番キー) + 実機ドライバで枝番継続・単件撮り直しを実測",
+      "draft": false
+    },
+    {
+      "id": "ti-hardening",
+      "diagramId": "l3-naming",
+      "ticketId": "t-core",
+      "category": "exception",
+      "title": "敵対的入力への堅牢性 (セキュリティレビュー起点)",
+      "condition": "タイトルに ../ ・予約名 CON・末尾スペース・300 文字、region.json に数値以外の値",
+      "expected": "パストラバーサルは成立せず、予約名と空になる名前は確定拒否、長い名前は 60 文字に切られ、壊れた region.json エントリは無視されてアプリは落ちない",
+      "result": "pass",
+      "resultNote": "2026-08-10 pytest 34 件 (traversal/予約名/末尾スペース/60文字切り詰め/region.json 敵対値) + 実機ドライバで回帰なし",
+      "draft": false
+    },
+    {
+      "id": "ti-filename-date",
+      "diagramId": "l3-naming",
+      "ticketId": "t-core",
+      "category": "normal",
+      "title": "ファイル名に撮影日時が入り、連番として読める",
+      "condition": "撮影して保存 → 同じフォルダで next_index / Excel 出力 / 撮り直し",
+      "expected": "「3_20260810_153045.png」形式で保存され、連番の継続・Excel 列挙・撮り直しの差し替え (旧ファイル削除) が正しく動く。旧形式「3.png」が混ざっても連番は壊れない",
+      "result": "pass",
+      "resultNote": "2026-08-10 pytest (parse_index/shot_filename/shots_for_index/旧形式混在) + 実機ドライバで日時付き保存と差し替え後の重複なしを確認",
+      "draft": false
+    },
+    {
+      "id": "ti-title-sanitize",
+      "diagramId": "l2-title",
+      "ticketId": "t-core",
+      "category": "boundary",
+      "title": "フォルダ名にできないタイトル",
+      "condition": "「A/B:C?」のような禁止文字入りタイトルを確定",
+      "expected": "禁止文字が除去されたフォルダ名で作成され、空になる場合は確定できない",
+      "result": "pass",
+      "resultNote": "2026-08-10 pytest (test_naming.TestSanitizeTitle)",
+      "draft": false
+    },
+    {
+      "id": "ti-retake-guide",
+      "diagramId": "l2-retake",
+      "ticketId": "t-retake",
+      "category": "state",
+      "title": "撮り直しで前回範囲ガイドが出て画像が差し替わる",
+      "condition": "同名タイトル→「はい」→#1 を撮影",
+      "expected": "前回 #1 の矩形がガイド表示され、1.png が新画像に置き換わり region.json も更新される",
+      "result": "pass",
+      "resultNote": "2026-08-10 実機ドライバ: ガイド表示 (03_retake_guide.png)・差し替え・region.json 更新を確認",
+      "draft": false
+    },
+    {
+      "id": "ti-excel-sheets",
+      "diagramId": "l2-excel",
+      "ticketId": "t-excel",
+      "category": "normal",
+      "title": "タイトルごとのシート生成と画像貼付",
+      "condition": "2 タイトル (3枚/2枚) の状態で Excel 出力",
+      "expected": "証跡.xlsx に 2 シートができ、各シートに連番順で画像と番号・時刻が並ぶ",
+      "result": "pass",
+      "resultNote": "2026-08-10 pytest (test_excel.TestExport) + 実機ドライバで証跡.xlsx 生成を確認",
+      "draft": false
+    },
+    {
+      "id": "ti-excel-locked",
+      "diagramId": "l2-excel",
+      "ticketId": "t-excel",
+      "category": "exception",
+      "title": "Excel ロック中の失敗通知",
+      "condition": "証跡.xlsx を Excel で開いたまま出力",
+      "expected": "処理名つきダイアログで失敗が伝わり、アプリは継続する",
+      "result": "pass",
+      "resultNote": "2026-08-10 pytest: Python の open() は共有ロックしないため、Excel 同等の CreateFileW(dwShareMode=0) で再現して PermissionError を確認",
+      "draft": false
+    },
+    {
+      "id": "ti-frame-passthrough",
+      "diagramId": "l2-capture",
+      "ticketId": "t-core",
+      "category": "state",
+      "title": "フレーム内側のクリック透過",
+      "condition": "点線フレームを別アプリの上に置き、内側をクリック",
+      "expected": "下のアプリが操作でき、枠・ボタンだけが反応する。フレームは常に最前面",
+      "result": "pass",
+      "resultNote": "2026-10-05 実機確認 (Win32 API、クリックは送らない): フレームを (300,300) 640×420 に出し WindowFromPoint を見た。内側の中心 (620,528) はフレームに当たらない、左の帯・上帯・下の帯は当たる。WS_EX_TOPMOST 付き。マスク (BAND=10, TOP_H=36) どおり",
+      "draft": false
+    },
+    {
+      "id": "ti-hotkey-scope",
+      "diagramId": "l2-capture",
+      "ticketId": "t-hotkey",
+      "category": "state",
+      "title": "ホットキーが起動中のみ効く",
+      "condition": "起動中に設定キー押下 → アプリ終了後に同じキーを押下",
+      "expected": "起動中は撮影が走り、終了後は OS 既定の動作に戻る",
+      "result": "pass",
+      "resultNote": "2026-10-05 実機確認: 設定は PrintScreen。起動前は別プロセスからの RegisterHotKey が成功、python -m app.main 起動中 (5 秒後) は失敗 (横取り中)、終了後はまた成功 (OS に戻る)",
+      "draft": false
+    },
+    {
+      "id": "ti-base-1",
+      "draft": false,
+      "result": "pass",
+      "ticketId": "t-core",
+      "diagramId": "l1-main",
+      "title": "基底 (段階 4・画面 5・クラス 11・引き継ぎ 2・要件 1) で M1〜M6 の指摘 0、doc-map-check ok",
+      "command": "node --import=tsx scripts/review_shelf.mjs src/shelves/evidence.json"
+    }
+  ],
+  "manualNotes": [
+    {
+      "id": "mn-usage",
+      "ticketId": "t-core",
+      "audience": "user",
+      "kind": "usage",
+      "title": "使い方一式 (保存先→タイトル→撮影→撮り直し→Excel 出力)",
+      "body": "c:\\work\\証跡システム\\README.md に反映済み。保存先とタイトルの指定、点線フレームの操作 (内側クリック透過)、連番の規則、同名タイトル時の撮り直し/追記の分岐、Excel 出力、撮影キーの仕様 (起動中のみ優先) を記載。",
+      "status": "reflected"
+    }
+  ],
+  "concerns": [
+    {
+      "id": "cn-ns-overwrite",
+      "diagramId": "l2-numspec",
+      "participantId": "p-ns-user",
+      "category": "operability",
+      "status": "dismissed",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:00:00+09:00",
+      "title": "誤操作: 撮影済みの番号を打って上書きしてしまう",
+      "description": "番号欄に既存の番号 (6) を入れて撮影すると、前の証跡が消える。",
+      "dismissReason": "既存番号は parse_number_input と既存ファイルの有無で見分け、「#6 は撮影済みです。撮り直しますか？」の確認を挟む (いいえ なら何も変えない)。はい の時だけその 1 件を撮り直す。試験 S-5 の項目で確認済み。"
+    },
+    {
+      "id": "cn-ns-format",
+      "diagramId": "l2-numspec",
+      "participantId": "p-ns-user",
+      "category": "operability",
+      "status": "dismissed",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:00:00+09:00",
+      "title": "不正な入力 (全角・空・文字) で番号が壊れる",
+      "description": "「５－１」や「abc」を入れた時に、連番が狂う・落ちる。",
+      "dismissReason": "全角数字は半角に正規化し、数字 または 数字-数字 以外はステータスに形式の案内を出して何も変えない (純ロジック parse_number_input、テスト対象)。"
+    },
+    {
+      "id": "cn-main-user",
+      "diagramId": "l1-main",
+      "participantId": "p-user",
+      "category": "operability",
+      "title": "誤操作 (同名タイトル・撮影済み番号・連打)",
+      "description": "上書きや番号の飛びが起きないか",
+      "status": "dismissed",
+      "dismissReason": "同名タイトルと既存番号は確認ダイアログ (l2-title / l2-numspec)。保存失敗は番号を進めない (l2-capture)。余分に撮った番号は番号指定の撮り直しで差し替えられる (S-5)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-main-xlsx",
+      "diagramId": "l1-main",
+      "participantId": "p-xlsx",
+      "category": "availability",
+      "title": "証跡.xlsx が Excel で開かれている",
+      "description": "出力が壊れないか",
+      "status": "dismissed",
+      "dismissReason": "ロック中は「ファイルを閉じてから再実行」の失敗ダイアログで止まり、既存ファイルは触らない (l2-excel)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-main-win",
+      "diagramId": "l1-main",
+      "participantId": "p-win",
+      "category": "availability",
+      "title": "ホットキーを他アプリが使っている",
+      "description": "撮影できなくならないか",
+      "status": "dismissed",
+      "dismissReason": "登録失敗は起動時に警告し、フレームのボタン撮影は使える (l2-hotkey)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-title-fs",
+      "diagramId": "l2-title",
+      "participantId": "p-ti-fs",
+      "category": "reliability",
+      "title": "フォルダを作れない (権限・不正な文字)",
+      "description": "落ちないか",
+      "status": "dismissed",
+      "dismissReason": "禁止文字は除去し、OSError は「フォルダ作成に失敗」ダイアログで捕捉する (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-title-user",
+      "diagramId": "l2-title",
+      "participantId": "p-ti-user",
+      "category": "operability",
+      "title": "誤って同名タイトルを入れて上書きする",
+      "description": "前の証跡が消えないか",
+      "status": "dismissed",
+      "dismissReason": "同名は「撮り直しますか？」の確認。いいえ なら最大番号 +1 から続きを撮る",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-cap-fs",
+      "diagramId": "l2-capture",
+      "participantId": "p-cp-fs",
+      "category": "reliability",
+      "title": "保存に失敗する (書込不可・容量)",
+      "description": "番号が進んで欠番になるか",
+      "status": "dismissed",
+      "dismissReason": "保存失敗はダイアログで知らせ、番号は進めない (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-cap-user",
+      "diagramId": "l2-capture",
+      "participantId": "p-cp-user",
+      "category": "operability",
+      "title": "ホットキーの連打で同じ画面を 2 枚撮る",
+      "description": "余分な番号が残るか",
+      "status": "dismissed",
+      "dismissReason": "余分な番号は番号指定 (S-5) で差し替えられ、Excel 出力は連番順に並ぶだけなので壊れない。許容",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-rt-user",
+      "diagramId": "l2-retake",
+      "participantId": "p-rt-user",
+      "category": "operability",
+      "title": "撮り直しの途中でタイトルを変える・終了する",
+      "description": "差し替え途中 (旧ファイルが残った番号と新しい番号が混在) の状態がどうなるかが図に無い",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-xl-fs",
+      "diagramId": "l2-excel",
+      "participantId": "p-xl-fs",
+      "category": "availability",
+      "title": "証跡.xlsx がロック中",
+      "description": "出力が途中で止まり壊れるか",
+      "status": "dismissed",
+      "dismissReason": "ロック中は失敗ダイアログ。毎回作り直す設計なので半端なファイルは残らない (L3: 証跡.xlsx は出力のたび再生成)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-xl-user",
+      "diagramId": "l2-excel",
+      "participantId": "p-xl-user",
+      "category": "performance",
+      "title": "枚数が多い (数百枚) 時の出力時間とメモリ",
+      "description": "画像を全部シートに貼るので、枚数が増えた時の時間・メモリは未実測",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-hk-os",
+      "diagramId": "l2-hotkey",
+      "participantId": "p-hk-os",
+      "category": "reliability",
+      "title": "強制終了で unregister が呼ばれない",
+      "description": "キーが横取りされたままにならないか",
+      "status": "dismissed",
+      "dismissReason": "RegisterHotKey はスレッド/プロセスに紐づき、プロセスが消えれば OS が解除する。実機確認 (2026-10-05): 起動中は別プロセスの登録が失敗、終了後は成功",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-hk-user",
+      "diagramId": "l2-hotkey",
+      "participantId": "p-hk-user",
+      "category": "operability",
+      "title": "他アプリがキーを使っていて登録できない",
+      "description": "撮影手段が無くならないか",
+      "status": "dismissed",
+      "dismissReason": "警告を出し、フレームのボタン撮影は使える。設定画面でキーを変えられる",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    }
+  ],
+  "phases": [
+    {
+      "id": "ph-setup",
+      "name": "初回セットアップ",
+      "order": 1,
+      "description": "python -m app.main で起動し、保存先ルートを決める"
+    },
+    {
+      "id": "ph-shoot",
+      "name": "撮影の日常",
+      "order": 2,
+      "description": "タイトル → 点線フレーム → 撮影 → 撮り直し → Excel 出力"
+    },
+    {
+      "id": "ph-settings",
+      "name": "設定",
+      "order": 3,
+      "description": "ホットキーを変える"
+    },
+    {
+      "id": "ph-exit",
+      "name": "終了",
+      "order": 4,
+      "description": "アプリを閉じるとホットキーが OS に戻る"
+    }
+  ],
+  "routes": [
+    {
+      "id": "rt-shoot",
+      "name": "撮影だけ",
+      "phaseIds": [
+        "ph-shoot"
+      ]
+    },
+    {
+      "id": "rt-full",
+      "name": "起動から終了まで",
+      "phaseIds": [
+        "ph-setup",
+        "ph-shoot",
+        "ph-settings",
+        "ph-exit"
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "sc-main-setup",
+      "phaseId": "ph-setup",
+      "name": "メイン窓 (保存先の指定)"
+    },
+    {
+      "id": "sc-main",
+      "phaseId": "ph-shoot",
+      "name": "メイン窓 (タイトル・番号・Excel)"
+    },
+    {
+      "id": "sc-frame",
+      "phaseId": "ph-shoot",
+      "name": "点線フレーム (最前面)"
+    },
+    {
+      "id": "sc-hotkey",
+      "phaseId": "ph-settings",
+      "name": "設定 (ホットキー)"
+    },
+    {
+      "id": "sc-close",
+      "phaseId": "ph-exit",
+      "name": "終了"
+    }
+  ],
+  "classes": [
+    {
+      "id": "cl-main-setup",
+      "screenId": "sc-main-setup",
+      "name": "MainWindow",
+      "kind": "ui",
+      "members": [
+        {
+          "id": "mb-root",
+          "kind": "function",
+          "name": "set_root_text",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str"
+            }
+          ],
+          "outputs": []
+        }
+      ]
+    },
+    {
+      "id": "cl-settings",
+      "screenId": "sc-main-setup",
+      "name": "SettingsService (QSettings)",
+      "kind": "data",
+      "members": [
+        {
+          "id": "mb-set-root",
+          "kind": "function",
+          "name": "set_root_folder",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "Path"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "id": "mb-get-root",
+          "kind": "function",
+          "name": "root_folder",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "root_dir",
+              "type": "Path"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cl-settings-hk",
+      "screenId": "sc-hotkey",
+      "name": "SettingsService (QSettings)",
+      "kind": "data",
+      "members": [
+        {
+          "id": "mb-set-hk",
+          "kind": "function",
+          "name": "set_hotkey_name",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "id": "mb-get-hk",
+          "kind": "function",
+          "name": "hotkey_name",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "hotkey",
+              "type": "str"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cl-main",
+      "screenId": "sc-main",
+      "name": "MainWindow",
+      "kind": "ui",
+      "members": [
+        {
+          "id": "mb-state",
+          "kind": "function",
+          "name": "set_state_text",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "id": "mb-status",
+          "kind": "function",
+          "name": "show_status",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str"
+            }
+          ],
+          "outputs": []
+        }
+      ]
+    },
+    {
+      "id": "cl-naming",
+      "screenId": "sc-main",
+      "name": "naming (純ロジック)",
+      "kind": "logic",
+      "members": [
+        {
+          "id": "mb-parse",
+          "kind": "function",
+          "name": "parse_number_input",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "number",
+              "type": "Number|None"
+            }
+          ]
+        },
+        {
+          "id": "mb-next",
+          "kind": "function",
+          "name": "next_main",
+          "inputs": [
+            {
+              "name": "existing_names",
+              "type": "Iterable[str]"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "number",
+              "type": "Number"
+            }
+          ]
+        },
+        {
+          "id": "mb-fname",
+          "kind": "function",
+          "name": "shot_filename",
+          "inputs": [
+            {
+              "name": "number",
+              "type": "Number"
+            },
+            {
+              "name": "taken_at",
+              "type": "datetime"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "name",
+              "type": "str"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cl-retake",
+      "screenId": "sc-main",
+      "name": "RetakeSession",
+      "kind": "logic",
+      "members": [
+        {
+          "id": "mb-cur",
+          "kind": "function",
+          "name": "current",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "number",
+              "type": "Number|None"
+            }
+          ]
+        },
+        {
+          "id": "mb-adv",
+          "kind": "function",
+          "name": "advance",
+          "inputs": [],
+          "outputs": []
+        }
+      ]
+    },
+    {
+      "id": "cl-excel",
+      "screenId": "sc-main",
+      "name": "excel_service",
+      "kind": "logic",
+      "members": [
+        {
+          "id": "mb-export",
+          "kind": "function",
+          "name": "export",
+          "inputs": [
+            {
+              "name": "root_dir",
+              "type": "Path"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "xlsx",
+              "type": "Path"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cl-frame",
+      "screenId": "sc-frame",
+      "name": "CaptureFrame",
+      "kind": "ui",
+      "members": [
+        {
+          "id": "mb-rect",
+          "kind": "function",
+          "name": "capture_rect",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "rect",
+              "type": "QRect"
+            }
+          ]
+        },
+        {
+          "id": "mb-move",
+          "kind": "function",
+          "name": "move_capture_rect_to",
+          "inputs": [
+            {
+              "name": "target",
+              "type": "QRect"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "id": "mb-flash",
+          "kind": "function",
+          "name": "flash",
+          "inputs": [],
+          "outputs": []
+        }
+      ]
+    },
+    {
+      "id": "cl-capture",
+      "screenId": "sc-frame",
+      "name": "capture_service",
+      "kind": "logic",
+      "members": [
+        {
+          "id": "mb-grab",
+          "kind": "function",
+          "name": "grab_region",
+          "inputs": [
+            {
+              "name": "rect",
+              "type": "QRect"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "pixmap",
+              "type": "QPixmap"
+            }
+          ]
+        },
+        {
+          "id": "mb-save",
+          "kind": "function",
+          "name": "save_png",
+          "inputs": [
+            {
+              "name": "pixmap",
+              "type": "QPixmap"
+            },
+            {
+              "name": "path",
+              "type": "Path"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "ok",
+              "type": "bool"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cl-region",
+      "screenId": "sc-frame",
+      "name": "RegionStore (region.json)",
+      "kind": "data",
+      "members": [
+        {
+          "id": "mb-rec",
+          "kind": "function",
+          "name": "record",
+          "inputs": [
+            {
+              "name": "number",
+              "type": "Number"
+            },
+            {
+              "name": "rect",
+              "type": "tuple[int, int, int, int]"
+            }
+          ],
+          "outputs": []
+        }
+      ]
+    },
+    {
+      "id": "cl-hotkey-set",
+      "screenId": "sc-hotkey",
+      "name": "HotkeyService",
+      "kind": "logic",
+      "members": [
+        {
+          "id": "mb-reg",
+          "kind": "function",
+          "name": "register",
+          "inputs": [
+            {
+              "name": "hotkey",
+              "type": "str"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "ok",
+              "type": "bool"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cl-hotkey-exit",
+      "screenId": "sc-close",
+      "name": "HotkeyService",
+      "kind": "logic",
+      "members": [
+        {
+          "id": "mb-unreg",
+          "kind": "function",
+          "name": "unregister",
+          "inputs": [
+            {
+              "name": "hotkey",
+              "type": "str"
+            }
+          ],
+          "outputs": []
+        }
+      ]
+    }
+  ],
+  "handoffs": [
+    {
+      "id": "ho-setup-shoot",
+      "fromPhaseId": "ph-setup",
+      "toPhaseId": "ph-shoot",
+      "ports": [
+        {
+          "name": "root_dir",
+          "type": "Path"
+        }
+      ],
+      "description": "保存先ルートは QSettings に残り、撮影と Excel 出力が使う"
+    },
+    {
+      "id": "ho-settings-exit",
+      "fromPhaseId": "ph-settings",
+      "toPhaseId": "ph-exit",
+      "ports": [
+        {
+          "name": "hotkey",
+          "type": "str"
+        }
+      ],
+      "description": "登録したキーを終了時に解除する"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "rq-evidence",
+      "key": "R-1",
+      "title": "番号付きの証跡を素早く撮り、撮り直し、Excel にまとめられること",
+      "scenarioIds": [
+        "l1-main"
+      ]
+    }
+  ]
+}

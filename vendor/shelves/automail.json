@@ -1,0 +1,1083 @@
+{
+  "version": 2,
+  "name": "AutoMail Core 設計",
+  "activeId": "l1-monthly",
+  "diagrams": [
+    {
+      "id": "l1-monthly",
+      "layer": "L1",
+      "title": "月次取得の全体フロー",
+      "ticketId": "t-impl-follow",
+      "participants": [
+        {
+          "id": "p-op",
+          "name": "運用者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-sched",
+          "name": "Scheduler / CLI",
+          "kind": "process"
+        },
+        {
+          "id": "p-core",
+          "name": "AutoMail Core",
+          "kind": "process"
+        },
+        {
+          "id": "p-drv",
+          "name": "Browser Driver",
+          "kind": "process"
+        },
+        {
+          "id": "p-site",
+          "name": "ベンダーサイト",
+          "kind": "system"
+        },
+        {
+          "id": "p-db",
+          "name": "SQLite / Storage",
+          "kind": "database"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-l1-1",
+          "kind": "message",
+          "fromId": "p-op",
+          "toId": "p-sched",
+          "text": "月次取得を開始 (run コマンド)",
+          "arrow": "sync",
+          "note": "Scheduler は未実装。現状は CLI / Web からの手動起動"
+        },
+        {
+          "id": "m-l1-2",
+          "kind": "message",
+          "fromId": "p-sched",
+          "toId": "p-core",
+          "text": "ジョブ作成 (ベンダー × 対象期間 × 書類種別)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b-l1-cred",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-cred-ok",
+              "label": "credential_ref を解決できた (env:// / prompt://)",
+              "items": [
+                {
+                  "id": "m-l1-3",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-drv",
+                  "text": "レシピ実行を委譲 (ログイン→請求ページ→期間指定→ダウンロード)",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-l1-4",
+                  "kind": "message",
+                  "fromId": "p-drv",
+                  "toId": "p-site",
+                  "text": "画面操作 (goto / fill / click)。操作間隔は automation.min_interval_seconds を下回らない",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-l1-5",
+                  "kind": "message",
+                  "fromId": "p-site",
+                  "toId": "p-drv",
+                  "text": "ページ・ダウンロードファイル",
+                  "arrow": "reply"
+                },
+                {
+                  "id": "b-l1-result",
+                  "kind": "block",
+                  "blockKind": "alt",
+                  "branches": [
+                    {
+                      "id": "br-ok",
+                      "label": "成功 (expect をすべて満たした)",
+                      "items": [
+                        {
+                          "id": "m-l1-6",
+                          "kind": "message",
+                          "fromId": "p-core",
+                          "toId": "p-db",
+                          "text": "_pending に一時保存 → 検証・抽出・重複判定 → 正式保存",
+                          "arrow": "sync",
+                          "linkTargetId": "l2-save"
+                        },
+                        {
+                          "id": "m-l1-7",
+                          "kind": "message",
+                          "fromId": "p-core",
+                          "toId": "p-db",
+                          "text": "証跡ログ・ファイルハッシュを記録",
+                          "arrow": "sync"
+                        },
+                        {
+                          "id": "m-l1-8",
+                          "kind": "message",
+                          "fromId": "p-core",
+                          "toId": "p-op",
+                          "text": "サマリ通知 (成功 / success_no_data)",
+                          "arrow": "reply"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "br-human",
+                      "label": "MFA・CAPTCHA を検出 (人間介入)",
+                      "items": [
+                        {
+                          "id": "m-l1-9",
+                          "kind": "message",
+                          "fromId": "p-core",
+                          "toId": "p-op",
+                          "text": "waiting_for_human を通知 (ブラウザは開いたまま保持)",
+                          "arrow": "async",
+                          "linkTargetId": "l2-mfa"
+                        },
+                        {
+                          "id": "m-l1-10",
+                          "kind": "message",
+                          "fromId": "p-op",
+                          "toId": "p-site",
+                          "text": "MFA コード入力 (CAPTCHA の自動突破はしない)",
+                          "arrow": "sync"
+                        },
+                        {
+                          "id": "m-l1-11",
+                          "kind": "message",
+                          "fromId": "p-core",
+                          "toId": "p-drv",
+                          "text": "ログイン完了を確認して再開 (待機は既定30分まで)",
+                          "arrow": "sync"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "br-fail",
+                      "label": "失敗 (想定外ページ・セレクタ不一致 等)",
+                      "items": [
+                        {
+                          "id": "m-l1-12",
+                          "kind": "message",
+                          "fromId": "p-core",
+                          "toId": "p-db",
+                          "text": "スクリーンショット・HTML 保存、失敗分類を記録",
+                          "arrow": "sync",
+                          "linkTargetId": "l2-failure"
+                        },
+                        {
+                          "id": "m-l1-13",
+                          "kind": "message",
+                          "fromId": "p-core",
+                          "toId": "p-op",
+                          "text": "失敗理由 (分類) と次の対応を通知。推測で先へは進まない",
+                          "arrow": "reply"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "br-cred-ng",
+              "label": "解決できない (未登録・vault:// 未実装)",
+              "items": [
+                {
+                  "id": "m-l1-14",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-op",
+                  "text": "credential_not_found として実行前に停止 (ログイン試行はしない)",
+                  "arrow": "lost",
+                  "note": "auth_failed (ログイン試行後の失敗) とは区別する。設計書 §19.1"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l2-failure",
+      "layer": "L2",
+      "title": "失敗分類と修復 (§13 / §18.2)",
+      "parentId": "l1-monthly",
+      "ticketId": "t-impl-follow",
+      "participants": [
+        {
+          "id": "p-core",
+          "name": "AutoMail Core",
+          "kind": "process"
+        },
+        {
+          "id": "p-ai",
+          "name": "AI Adapter",
+          "kind": "system"
+        },
+        {
+          "id": "p-op",
+          "name": "運用者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-db",
+          "name": "SQLite / Storage",
+          "kind": "database"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-f-1",
+          "kind": "message",
+          "fromId": "p-core",
+          "toId": "p-db",
+          "text": "失敗分類を記録 (18種: 16 + captcha_required + credential_not_found)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b-f-alt",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-f-nodata",
+              "label": "document_not_found (書類0件)",
+              "items": [
+                {
+                  "id": "m-f-2",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-db",
+                  "text": "success_no_data として記録",
+                  "arrow": "sync",
+                  "note": "成功扱いは「一覧要素の取得＋期間指定成功＋0件表示の確認」の3条件を満たす場合のみ。一覧自体が見つからなければ ui_changed。§13.3"
+                },
+                {
+                  "id": "m-f-3",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-op",
+                  "text": "同一ベンダーで3回連続 no_data なら review_required (取得漏れ検知)",
+                  "arrow": "async"
+                }
+              ]
+            },
+            {
+              "id": "br-f-ui",
+              "label": "ui_changed (画面構造の変更)",
+              "items": [
+                {
+                  "id": "m-f-4",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-ai",
+                  "text": "修復候補を依頼 (渡すのは sanitizer のマスク済み断片のみ。PDF・HTML の全文は渡さない)",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-f-5",
+                  "kind": "message",
+                  "fromId": "p-ai",
+                  "toId": "p-core",
+                  "text": "セレクタ候補・レシピ修正案 (repair_proposal)",
+                  "arrow": "reply"
+                },
+                {
+                  "id": "m-f-6",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-op",
+                  "text": "Dry Run (download/save/DB書込なし) の結果を添えて人間レビューへ",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-f-7",
+                  "kind": "message",
+                  "fromId": "p-op",
+                  "toId": "p-core",
+                  "text": "承認 → レシピ version+1、旧版は history/ にバックアップ",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-f-stop",
+              "label": "captcha_required / unexpected_page (即停止系)",
+              "items": [
+                {
+                  "id": "m-f-8",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-op",
+                  "text": "即停止して人間対応へ。回避・突破・強行操作はしない (§19.4)",
+                  "arrow": "lost"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l2-mfa",
+      "layer": "L2",
+      "title": "MFA 待機と再開 (§14.4)",
+      "parentId": "l1-monthly",
+      "ticketId": "t-storage-state",
+      "participants": [
+        {
+          "id": "p-op",
+          "name": "運用者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-core",
+          "name": "AutoMail Core",
+          "kind": "process"
+        },
+        {
+          "id": "p-drv",
+          "name": "Browser Driver",
+          "kind": "process"
+        },
+        {
+          "id": "p-site",
+          "name": "ベンダーサイト",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-m-1",
+          "kind": "message",
+          "fromId": "p-drv",
+          "toId": "p-core",
+          "text": "MFA 画面を検出 (detect)",
+          "arrow": "reply"
+        },
+        {
+          "id": "m-m-2",
+          "kind": "message",
+          "fromId": "p-core",
+          "toId": "p-op",
+          "text": "waiting_for_human を通知 (Web UI のバナー)",
+          "arrow": "async",
+          "note": "再開に必要なのは生きたブラウザセッション。DB に保存できる状態ではないため、ブラウザは閉じずに同一プロセス内で保持する (headless=false 前提)"
+        },
+        {
+          "id": "b-m-alt",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-m-ok",
+              "label": "30分以内に人間が入力した",
+              "items": [
+                {
+                  "id": "m-m-3",
+                  "kind": "message",
+                  "fromId": "p-op",
+                  "toId": "p-site",
+                  "text": "MFA コードを入力",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-m-4",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-drv",
+                  "text": "ログイン完了を確認してジョブ再開",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-m-5",
+                  "kind": "message",
+                  "fromId": "p-drv",
+                  "toId": "p-core",
+                  "text": "storage_state を暗号化して保存 (後続ジョブの再ログイン省略。ログには出さない)",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "br-m-timeout",
+              "label": "タイムアウト (既定30分)",
+              "items": [
+                {
+                  "id": "m-m-6",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-op",
+                  "text": "mfa_required のまま failed。再実行はジョブの最初からやり直す (ステップ途中からの復元は MVP スコープ外)",
+                  "arrow": "lost"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l2-save",
+      "layer": "L2",
+      "title": "保存ステージング (§15.4)",
+      "parentId": "l1-monthly",
+      "ticketId": "t-impl-follow",
+      "participants": [
+        {
+          "id": "p-core",
+          "name": "AutoMail Core",
+          "kind": "process"
+        },
+        {
+          "id": "p-db",
+          "name": "SQLite / Storage",
+          "kind": "database"
+        },
+        {
+          "id": "p-op",
+          "name": "運用者",
+          "kind": "actor"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-s-1",
+          "kind": "message",
+          "fromId": "p-core",
+          "toId": "p-db",
+          "text": "storage/_pending/{job_id}/ に一時保存",
+          "arrow": "sync",
+          "note": "正式なファイル名は invoice_no と amount を要求するため、メタデータ確定前は正式保存できない"
+        },
+        {
+          "id": "m-s-2",
+          "kind": "message",
+          "fromId": "p-core",
+          "toId": "p-db",
+          "text": "ファイル検証 (存在・サイズ・PDF可読) → メタデータ抽出 → 重複判定",
+          "arrow": "sync",
+          "note": "重複判定の MVP はハッシュ・請求番号・日付+金額の3手段のみ。日付+金額の単独一致は possible_duplicate 止まり (同額の月額課金で誤検知するため)。§11"
+        },
+        {
+          "id": "b-s-alt",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-s-ok",
+              "label": "検証・抽出・重複判定がすべて成功",
+              "items": [
+                {
+                  "id": "m-s-3",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-db",
+                  "text": "正式パスへ命名して移動 ({vendor}/{年}/{月}/ + 命名規則)。ハッシュを DB に記録",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "br-s-meta",
+              "label": "metadata_missing (必須項目が抽出できない)",
+              "items": [
+                {
+                  "id": "m-s-4",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-op",
+                  "text": "review_required を通知。ファイルは _pending に保持",
+                  "arrow": "async"
+                },
+                {
+                  "id": "m-s-5",
+                  "kind": "message",
+                  "fromId": "p-op",
+                  "toId": "p-core",
+                  "text": "人間が値を補完・確定",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-s-6",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-db",
+                  "text": "確定値で正式パスへ移動",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "br-s-dup",
+              "label": "possible_duplicate / version_changed",
+              "items": [
+                {
+                  "id": "m-s-7",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-op",
+                  "text": "人間レビューへ。自動上書き・自動確定はしない",
+                  "arrow": "async",
+                  "note": "再発行等で金額が変わっても既存ファイルはリネームしない。正は DB のメタデータ (電帳法の検索要件も DB で担保。§15.5)"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l1-followup",
+      "layer": "L1",
+      "title": "設計書の実装追随運用 (§23.3)",
+      "ticketId": "t-audit-reflect",
+      "participants": [
+        {
+          "id": "p-dev",
+          "name": "開発者",
+          "kind": "actor"
+        },
+        {
+          "id": "p-doc",
+          "name": "AUTOMAIL_CORE_DESIGN.md",
+          "kind": "system"
+        },
+        {
+          "id": "p-shelf",
+          "name": "SeqShelf 本棚 (automail.json)",
+          "kind": "system"
+        },
+        {
+          "id": "p-code",
+          "name": "automail/ 実装",
+          "kind": "process"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-fu-1",
+          "kind": "message",
+          "fromId": "p-dev",
+          "toId": "p-doc",
+          "text": "実装前に設計節を追記・更新する (なぜ今のままでは駄目かを書く)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-fu-2",
+          "kind": "message",
+          "fromId": "p-dev",
+          "toId": "p-shelf",
+          "text": "図とチケットを更新し validate / review で指摘 0 を確認",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-fu-2r",
+          "kind": "message",
+          "fromId": "p-shelf",
+          "toId": "p-dev",
+          "text": "validate / review の結果 (指摘一覧。0 になるまで設計を直す)",
+          "arrow": "reply"
+        },
+        {
+          "id": "m-fu-3",
+          "kind": "message",
+          "fromId": "p-dev",
+          "toId": "p-code",
+          "text": "設計に沿って実装 (違う判断をしたらメモを残す)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-fu-3r",
+          "kind": "message",
+          "fromId": "p-code",
+          "toId": "p-dev",
+          "text": "テスト結果 (失敗があれば実装かレシピを直してから次へ)",
+          "arrow": "reply"
+        },
+        {
+          "id": "m-fu-4",
+          "kind": "message",
+          "fromId": "p-dev",
+          "toId": "p-doc",
+          "text": "as-built を §23.2 へ反映 (モジュールの新設・改名は §4 責務表と同じコミットで)",
+          "arrow": "sync",
+          "note": "2026-08-19 の監査で「ドラフトのまま実装が先行し乖離」を検出した再発防止。設計にあって実装にないもの・実装にあって設計にないものを放置しない"
+        },
+        {
+          "id": "b-fu-alt",
+          "kind": "block",
+          "blockKind": "opt",
+          "branches": [
+            {
+              "id": "br-fu-gap",
+              "label": "乖離を見つけた場合",
+              "items": [
+                {
+                  "id": "m-fu-5",
+                  "kind": "message",
+                  "fromId": "p-dev",
+                  "toId": "p-shelf",
+                  "text": "監査チケットを起票し、指摘と反映先を記録してから直す (AM-1 の例に倣う)",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l3-save-fn",
+      "layer": "L3",
+      "title": "保存ステージングの関数フロー (§15.4 実装設計)",
+      "parentId": "l2-save",
+      "ticketId": "t-impl-follow",
+      "participants": [
+        {
+          "id": "p-core",
+          "name": "AutoMailCore._finalize",
+          "kind": "function"
+        },
+        {
+          "id": "p-sm",
+          "name": "StorageManager",
+          "kind": "class"
+        },
+        {
+          "id": "p-dd",
+          "name": "DuplicateDetector",
+          "kind": "class"
+        },
+        {
+          "id": "p-repo",
+          "name": "Repository (SQLite)",
+          "kind": "class"
+        }
+      ],
+      "items": [
+        {
+          "id": "m-s3-1",
+          "kind": "message",
+          "fromId": "p-core",
+          "toId": "p-sm",
+          "text": "save_pending(job_id, file) — storage/_pending/{job_id}/ へ一時保存 [実装済み]",
+          "arrow": "sync",
+          "note": "as-built: 実装前は metadata_missing 時にファイルが work_dir ごと削除され消失していた。AutoMailCore._finalize を work_dir 削除より前に移して _pending 退避を実装（test_automail_newspec.py で検証）"
+        },
+        {
+          "id": "m-s3-2",
+          "kind": "message",
+          "fromId": "p-core",
+          "toId": "p-core",
+          "text": "ファイル検証 (存在・サイズ下限・PDF 可読) とメタデータ抽出 (現状は簡易実装)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-s3-3",
+          "kind": "message",
+          "fromId": "p-core",
+          "toId": "p-dd",
+          "text": "check(hash, invoice_no, date+amount) — MVP は3手段のみ",
+          "arrow": "sync"
+        },
+        {
+          "id": "m-s3-4",
+          "kind": "message",
+          "fromId": "p-dd",
+          "toId": "p-core",
+          "text": "new / exact_duplicate / possible_duplicate (date+amount 単独一致は possible 止まり)",
+          "arrow": "reply"
+        },
+        {
+          "id": "b-s3-alt",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "br-s3-ok",
+              "label": "検証・抽出・重複判定がすべて成功",
+              "items": [
+                {
+                  "id": "m-s3-5",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-sm",
+                  "text": "promote(pending_path, path_rule, filename_rule) — 正式パスへ移動 [新設]",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m-s3-6",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-repo",
+                  "text": "record_document(metadata, file_hash_sha256)",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "br-s3-meta",
+              "label": "metadata_missing",
+              "items": [
+                {
+                  "id": "m-s3-7",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-repo",
+                  "text": "ジョブを review_required で記録。ファイルは _pending に残す (正式命名しない)",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "br-s3-dup",
+              "label": "exact_duplicate",
+              "items": [
+                {
+                  "id": "m-s3-8",
+                  "kind": "message",
+                  "fromId": "p-core",
+                  "toId": "p-repo",
+                  "text": "保存スキップを証跡に記録 (_pending のファイルは削除)",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "tickets": [
+    {
+      "id": "t-audit-reflect",
+      "key": "AM-1",
+      "title": "設計監査13件の設計書反映",
+      "description": "なぜ: AUTOMAIL_CORE_DESIGN.md がドラフト（構想）のまま実装 (automail/ 約3,800行) が先行し、as-built が戻されていなかった。特に「認証情報の保存方式」「MFA 待機→再開の状態保持」「メタデータ未確定ファイルの保存先」「Dry Run の定義」の4点が未決定のままで、実装がその場判断に流れる状態だった。加えて document_not_found→success_no_data がセレクタ劣化を隠す欠陥、AI への情報制限 (§19.3) と AI 補助抽出 (§12.3) の矛盾があった。\n\n対応 (2026-08-19): 監査で挙げた13件をすべて設計書に反映。追加節: §8.3 (アクション意味論・Dry Run 定義) / §12.4 (AI 抽出はマスク済み断片のみ) / §13.3 (document_not_found の3条件) / §14.4 (MFA 待機はブラウザ保持・30分) / §15.4-15.5 (_pending ステージング・電帳法) / §19.1 改 (credential_ref 解決仕様: env:// と prompt:// 実装済み、vault:// 未実装) / §19.4 (利用規約確認・captcha_required) / §23.2-23.4 (as-built・実装追随ルール・app/ 凍結)。\n\n棄却した案: (1) keyring を MVP 必須にする案 → 実装済みの env:// / prompt:// で MVP は足りるため Phase 4 送り。(2) 類似 PDF 判定を重複判定に含める案 → 手法未定のまま設計に残すと実装が推測で進むため将来拡張へ降格。(3) プロセス再起動をまたぐ MFA 復元 → 生きたブラウザセッションは DB に保存できず、実現手段がないため MVP スコープ外と明記。",
+      "priority": "high",
+      "stages": {
+        "design": "done",
+        "build": "na",
+        "test": "na",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "done"
+      }
+    },
+    {
+      "id": "t-impl-follow",
+      "key": "AM-2",
+      "title": "新仕様の実装追随 (§13.3 / §14.4 / §15.4 / §19.4)",
+      "description": "なぜ: 監査反映 (AM-1) は設計書側の修正であり、実装はまだ旧仕様のまま動いている箇所がある。設計だけ直して実装が追随しないと、せっかく明文化した「一覧欠落は ui_changed」「_pending ステージング」等が絵に描いた餅になる。\n\n実装が必要なもの: (1) document_not_found の3条件判定と3回連続 no_data → review_required (§13.3)。(2) MFA 待機の30分タイムアウトと storage_state 暗号化保存 (§14.4)。(3) storage/_pending/{job_id}/ ステージングと確定後移動 (§15.4)。(4) captcha_required の検出・即停止と automation.terms_reviewed / min_interval_seconds の enforcement (§19.4)。(5) 日付+金額の単独一致を possible_duplicate 止まりにする (§11)。\n\n実装状況は要確認: 一部 (Dry Run、credential_not_found) は実装済みの可能性がある。着手時に §23.2 の as-built と突き合わせてから差分を決めること。\n\nas-built (2026-08-19 実装完了): (1)(3)(4)(5) を実装、(2) はタイムアウト+failed確定のみ実装し storage_state 暗号化保存は AM-4 へ分離。実装で分かったこと: ・metadata_missing 時にダウンロード済みファイルが work_dir ごと削除され消失する実バグがあった（_finalize を work_dir 削除より前に移動して修正）。 ・介入タイムアウトは従来 waiting_for_human のまま残り、ブラウザは閉じられ再開不能のゾンビ状態になっていた（InterventionTimeout 例外で failed 確定に変更）。 ・重複判定(5)は既存実装が仕様を満たしていたためテストのみ追加。 ・§13.3 の3条件のうち「一覧確認」は実行時に機械判定できないため、 on_failure: document_not_found のレシピ検証禁止（不在ベース判定の排除）+ no_data 3回連続検知で担保する方式を採用。 棄却した案: 実行時に一覧要素の存在履歴を追跡して判定する案 → レシピの書き方に依存し誤判定するため、検証時の静的禁止にした。",
+      "priority": "high",
+      "stages": {
+        "design": "done",
+        "build": "done",
+        "test": "done",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "done"
+      }
+    },
+    {
+      "id": "t-vendor-select",
+      "key": "AM-3",
+      "title": "実ベンダー3社の選定と運用開始",
+      "description": "なぜ: MVP 成功条件 (§21.3) は「3社の前月分領収書/インボイスを取得できる」だが、登録済みベンダーはローカルダミー (kagoya_demo) のみで、実ベンダーが1社もない。運用開始にはユーザーによる3社の選定・ログイン URL・認証情報の env:// 設定が必要 (docs/AUTOMAIL_ONBOARDING.md 参照)。\n\n選定時の必須確認: 各ベンダーの利用規約で自動アクセスの可否を確認し、Vendor Profile の automation.terms_reviewed に記録する (§19.4)。未確認のベンダーは本番実行しない。",
+      "priority": "normal",
+      "stages": {
+        "design": "none",
+        "build": "none",
+        "test": "none",
+        "bugfix": "none",
+        "seqsync": "none",
+        "manual": "none"
+      }
+    },
+    {
+      "id": "t-storage-state",
+      "key": "AM-4",
+      "title": "storage_state の暗号化保存（再ログイン省略）",
+      "description": "なぜ: §14.4 は「ログイン完了後に Playwright の storage_state を暗号化保存し、同一ベンダーの後続ジョブで再ログインを省略する」と定めるが未実装。毎回ログインするため MFA 付きベンダーでは実行のたびに人間介入が必要になる。\n\n前提の訂正 (2026-08-19 実測): cryptography は旧アプリ app/storage/crypto.py (Fernet) が既に使用しており依存追加は不要（requirements.txt 記載漏れは修正済み）。鍵は data/secret.key の get_or_create_key を流用できる。実装に必要なもの: BrowserDriver への save/load_storage_state 追加、ログ・証跡への漏えい防止。取得のたびに保存し、期限切れ（session_expired）時は捨てて再ログインする。\n\n分離の理由: AM-2 の他項目と違い依存追加と鍵管理の設計判断が必要で、再ログイン省略は最適化であり安全性に影響しないため。\n\n真の設計課題: 復元したセッションとレシピの整合。レシピはログインステップを含む前提なので、storage_state を復元しても現状はログインを再実行してしまう。「ログイン済みなら請求ページへ直行する」分岐をレシピにどう書かせるか（entry の分岐 or detect による判定）を設計してから実装する。",
+      "priority": "normal",
+      "stages": {
+        "design": "done",
+        "build": "none",
+        "test": "none",
+        "bugfix": "none",
+        "seqsync": "none",
+        "manual": "none"
+      }
+    }
+  ],
+  "comments": [],
+  "history": [],
+  "snapshots": [],
+  "testItems": [
+    {
+      "id": "ti-nodata-ui",
+      "diagramId": "l2-failure",
+      "itemId": "m-f-2",
+      "ticketId": "t-impl-follow",
+      "category": "state",
+      "title": "一覧要素が欠落した場合は success_no_data にしない",
+      "condition": "請求一覧のテーブル/リスト要素が見つからないページで find_document を実行する",
+      "expected": "document_not_found ではなく ui_changed に分類され、ジョブが停止する (成功扱いにならない)",
+      "result": "pass",
+      "resultNote": "test_automail_newspec.py::TestDocumentNotFound::test_on_failure_document_not_found_is_rejected（レシピ検証で禁止する実装にした）",
+      "draft": false
+    },
+    {
+      "id": "ti-nodata-streak",
+      "diagramId": "l2-failure",
+      "itemId": "m-f-3",
+      "ticketId": "t-impl-follow",
+      "category": "boundary",
+      "title": "success_no_data の3回連続で review_required",
+      "condition": "同一ベンダー・同一書類種別で success_no_data を3回連続させる",
+      "expected": "3回目で review_required として人間レビューに通知される (2回目まではされない)",
+      "result": "pass",
+      "resultNote": "test_automail_newspec.py::TestDocumentNotFound::test_three_consecutive_no_data_becomes_review_required",
+      "draft": false
+    },
+    {
+      "id": "ti-mfa-timeout",
+      "diagramId": "l2-mfa",
+      "itemId": "m-m-6",
+      "ticketId": "t-impl-follow",
+      "category": "boundary",
+      "title": "MFA 待機の30分タイムアウト",
+      "condition": "MFA 検出後、30分間人間が入力しない",
+      "expected": "mfa_required のまま failed になり、ブラウザが閉じられる。再実行はジョブの最初から",
+      "result": "pass",
+      "resultNote": "test_automail_newspec.py::TestInterventionTimeout（ブラウザを閉じる前に failed で確定。ゾンビ状態を作らない）",
+      "draft": false
+    },
+    {
+      "id": "ti-pending-stage",
+      "diagramId": "l2-save",
+      "itemId": "m-s-3",
+      "ticketId": "t-impl-follow",
+      "category": "normal",
+      "title": "_pending ステージングから正式保存への移動",
+      "condition": "検証・抽出・重複判定がすべて成功するファイルをダウンロードする",
+      "expected": "storage/_pending/{job_id}/ を経由して正式パスへ移動し、_pending 側は空になる。ハッシュが DB に記録される",
+      "result": "pass",
+      "resultNote": "test_automail_newspec.py::TestPendingStaging::test_success_leaves_pending_empty",
+      "draft": false
+    },
+    {
+      "id": "ti-cred-notfound",
+      "diagramId": "l1-monthly",
+      "itemId": "m-l1-14",
+      "ticketId": "t-impl-follow",
+      "category": "error",
+      "title": "credential_ref 未解決で実行前に停止",
+      "condition": "auth.credential_ref の環境変数を設定せずにジョブを実行する",
+      "expected": "ログイン試行の前に credential_not_found で停止する (ベンダーサイトへのアクセスが発生しない)",
+      "result": "pass",
+      "resultNote": "test_automail_newspec.py::TestCredentialNotFound（ドライバ未生成=サイトアクセスなしを確認）",
+      "draft": false
+    },
+    {
+      "id": "ti-dup-samemonth",
+      "diagramId": "l2-save",
+      "itemId": "m-s-7",
+      "ticketId": "t-impl-follow",
+      "category": "exception",
+      "title": "同額同日の別請求書を誤って重複扱いしない",
+      "condition": "同一ベンダー・同一発行日・同一金額でハッシュと請求番号が異なる2ファイルを取得する",
+      "expected": "exact_duplicate にならず possible_duplicate として人間レビューへ回る (自動スキップされない)",
+      "result": "pass",
+      "resultNote": "test_automail_newspec.py::TestDuplicateSameAmount（既存実装が仕様を満たしていた。テストのみ追加）",
+      "draft": false
+    }
+  ],
+  "manualNotes": [
+    {
+      "id": "mn-design-changelog",
+      "ticketId": "t-audit-reflect",
+      "audience": "operator",
+      "kind": "changelog",
+      "title": "設計書 2026-08-19 更新 (監査13件反映)",
+      "body": "AUTOMAIL_CORE_DESIGN.md に §8.3 / §12.4 / §13.3 / §14.4 / §15.4-15.5 / §19.4 / §23.3-23.4 を追加。失敗分類に captcha_required と credential_not_found を追加。設計書は「実装追随ドラフト」となり、as-built は §23.2 で管理する。監査の全文はアーティファクト「AutoMail Core 設計監査」を参照。",
+      "status": "reflected"
+    },
+    {
+      "id": "mn-terms-check",
+      "ticketId": "t-vendor-select",
+      "audience": "operator",
+      "kind": "caution",
+      "title": "実ベンダー追加前に利用規約を確認する",
+      "body": "ベンダーを追加する前に、そのサイトの利用規約で自動アクセスの可否を確認し、vendor_profile.yaml の automation.terms_reviewed に確認結果と日付を記録する。未確認のまま本番実行しない。CAPTCHA が出た場合は自動突破せず停止する。(AUTOMAIL_ONBOARDING.md §1-1b に反映済み)",
+      "status": "reflected"
+    }
+  ],
+  "concerns": [
+    {
+      "id": "cn-mo-site",
+      "diagramId": "l1-monthly",
+      "participantId": "p-site",
+      "category": "availability",
+      "title": "ベンダーサイトの停止・画面変更",
+      "description": "推測で操作を進めないか",
+      "status": "dismissed",
+      "dismissReason": "想定外ページ・セレクタ不一致は失敗分類を記録して停止し、推測で先へ進まない (図の分岐、l2-failure)。CAPTCHA は突破しない",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-mo-op",
+      "diagramId": "l1-monthly",
+      "participantId": "p-op",
+      "category": "operability",
+      "title": "MFA の入力者が不在",
+      "description": "ジョブが滞留しないか",
+      "status": "dismissed",
+      "dismissReason": "waiting_for_human は既定 30 分でタイムアウトし failed。再実行はジョブの最初から (l2-mfa)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-mo-db",
+      "diagramId": "l1-monthly",
+      "participantId": "p-db",
+      "category": "reliability",
+      "title": "正式保存の途中 (移動とハッシュ記録の間) で落ちる",
+      "description": "ファイルは移動済みで DB に無い、という状態の扱いが図に無い (l2-save も同じ)",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-fl-ai",
+      "diagramId": "l2-failure",
+      "participantId": "p-ai",
+      "category": "availability",
+      "title": "AI Adapter に繋がらない時の ui_changed",
+      "description": "修復候補を依頼できない時に、人間レビューへどう渡すかが図に無い",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-fl-op",
+      "diagramId": "l2-failure",
+      "participantId": "p-op",
+      "category": "operability",
+      "title": "レビュー担当が不在",
+      "description": "勝手に進まないか",
+      "status": "dismissed",
+      "dismissReason": "review_required / repair_proposal は人間の承認まで止まり、自動確定・自動上書きはしない (図の各分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-fl-db",
+      "diagramId": "l2-failure",
+      "participantId": "p-db",
+      "category": "reliability",
+      "title": "失敗分類の記録に失敗する",
+      "description": "分類が失われるか",
+      "status": "dismissed",
+      "dismissReason": "記録は 18 種の分類だけで、添付 (スクリーンショット・HTML) はファイルに保存する (l1-monthly)。記録自体の失敗は cn-mo-db と同じ課題として扱う",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-mfa-op",
+      "diagramId": "l2-mfa",
+      "participantId": "p-op",
+      "category": "operability",
+      "title": "30 分以内に入力されない",
+      "description": "ブラウザが開いたまま残らないか",
+      "status": "dismissed",
+      "dismissReason": "タイムアウトで mfa_required のまま failed にし、ジョブの最初からやり直す (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-mfa-site",
+      "diagramId": "l2-mfa",
+      "participantId": "p-site",
+      "category": "security",
+      "title": "storage_state の暗号化保存 (再ログイン省略)",
+      "description": "AM-4 で未実装。鍵は data/secret.key、ログ・証跡への漏えい防止の設計が残っている",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-sv-op",
+      "diagramId": "l2-save",
+      "participantId": "p-op",
+      "category": "operability",
+      "title": "review_required が放置される",
+      "description": "ファイルが失われるか",
+      "status": "dismissed",
+      "dismissReason": "ファイルは _pending に保持され、人間が確定するまで動かさない (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-sv-db",
+      "diagramId": "l2-save",
+      "participantId": "p-db",
+      "category": "reliability",
+      "title": "正式パスへ移動した後の DB 記録に失敗",
+      "description": "移動済みなのに DB に無い状態の復旧 (再実行で possible_duplicate になるか) が図に無い",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-fu-dev",
+      "diagramId": "l1-followup",
+      "participantId": "p-dev",
+      "category": "operability",
+      "title": "開発者が手順を飛ばして実装する",
+      "description": "設計書と実装が乖離しないか",
+      "status": "dismissed",
+      "dismissReason": "validate / review / doc-map-check の機械検査で指摘が出る。乖離は監査チケット (AM-1 の例) で記録してから直す (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-fu-doc",
+      "diagramId": "l1-followup",
+      "participantId": "p-doc",
+      "category": "reliability",
+      "title": "設計書と本棚の二重管理で食い違う",
+      "description": "どちらが正か分からなくならないか",
+      "status": "dismissed",
+      "dismissReason": "クラス・関数レベルは本棚、節の文章は設計書、と持ち場を分け、as-built は §23.2 と本棚の同じコミットで反映する (図の手順)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-fu-shelf",
+      "diagramId": "l1-followup",
+      "participantId": "p-shelf",
+      "category": "reliability",
+      "title": "本棚 JSON の壊れ・手編集ミス",
+      "description": "読めなくならないか",
+      "status": "dismissed",
+      "dismissReason": "validate_shelf で構造を検査し、git 管理で戻せる",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    }
+  ]
+}

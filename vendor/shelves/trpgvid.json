@@ -1,0 +1,2993 @@
+{
+  "version": 2,
+  "name": "🎲 TRPG 動画 設計",
+  "activeId": "L2-camera-shot-variation",
+  "diagrams": [
+    {
+      "id": "L1-baseline-job",
+      "layer": "L1",
+      "title": "標準ジョブ: セッション音声を動画に仕上げて共有する",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者 (GM/卓主催者)",
+          "kind": "actor"
+        },
+        {
+          "id": "trpgvid",
+          "name": "trpgvid",
+          "kind": "system"
+        },
+        {
+          "id": "audience",
+          "name": "卓メンバー/視聴者",
+          "kind": "actor"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "trpgvid",
+          "text": "セッション音源を持ち込み「動画にしてほしい」と依頼",
+          "arrow": "sync",
+          "linkTargetId": "L2-quick-generate"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "trpgvid",
+          "toId": "user",
+          "text": "たたき台の動画を提示",
+          "arrow": "reply"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "たたき台のまま使える",
+              "items": [
+                {
+                  "id": "m3",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "audience",
+                  "text": "動画を共有する",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "手直ししたい箇所がある",
+              "items": [
+                {
+                  "id": "b1b1",
+                  "kind": "block",
+                  "blockKind": "loop",
+                  "branches": [
+                    {
+                      "id": "b1b1a",
+                      "label": "納得いくまで",
+                      "items": [
+                        {
+                          "id": "m4",
+                          "kind": "message",
+                          "fromId": "user",
+                          "toId": "trpgvid",
+                          "text": "気になる箇所を直すよう頼む",
+                          "arrow": "sync",
+                          "linkTargetId": "L2-edit-rerender-loop"
+                        },
+                        {
+                          "id": "m5",
+                          "kind": "message",
+                          "fromId": "trpgvid",
+                          "toId": "user",
+                          "text": "直した版を見せる",
+                          "arrow": "reply"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "m6",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "audience",
+                  "text": "動画を共有する",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "L1-quality-obsessed-job",
+      "layer": "L1",
+      "title": "こだわりジョブ: 見栄えを優先して比べながら詰める",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "trpgvid",
+          "name": "trpgvid",
+          "kind": "system"
+        },
+        {
+          "id": "external",
+          "name": "外部AIサービス (Claude/画像生成)",
+          "kind": "system"
+        },
+        {
+          "id": "audience",
+          "name": "卓メンバー/視聴者",
+          "kind": "actor"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "trpgvid",
+          "text": "演出重視で作ってほしいと依頼 (凝った立ち絵・演出を希望)",
+          "arrow": "sync",
+          "linkTargetId": "L2-multispeaker-claude"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "opt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "無料の範囲では物足りない",
+              "items": [
+                {
+                  "id": "m2",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "external",
+                  "text": "課金してでも良い絵/文章にする判断をする",
+                  "arrow": "sync",
+                  "note": "外部サービス利用料が発生する意思決定。ここが『こだわりジョブ』特有の分岐点"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "loop",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "満足いくまで見比べる",
+              "items": [
+                {
+                  "id": "m3",
+                  "kind": "message",
+                  "fromId": "trpgvid",
+                  "toId": "user",
+                  "text": "候補を提示",
+                  "arrow": "reply"
+                },
+                {
+                  "id": "m4",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "trpgvid",
+                  "text": "別パターンを試すよう頼む",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m5",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "audience",
+          "text": "一番良い版を共有する",
+          "arrow": "sync"
+        }
+      ]
+    },
+    {
+      "id": "L1-collaborative-job",
+      "layer": "L1",
+      "title": "共同編集ジョブ: 卓メンバーを巻き込んで作る",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者 (取りまとめ役)",
+          "kind": "actor"
+        },
+        {
+          "id": "members",
+          "name": "卓メンバー",
+          "kind": "actor"
+        },
+        {
+          "id": "trpgvid",
+          "name": "trpgvid",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "par",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "音源を持ち寄る",
+              "items": [
+                {
+                  "id": "m1",
+                  "kind": "message",
+                  "fromId": "members",
+                  "toId": "user",
+                  "text": "自分のパートの音声を渡す",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "見た目の希望を伝える",
+              "items": [
+                {
+                  "id": "m2",
+                  "kind": "message",
+                  "fromId": "members",
+                  "toId": "user",
+                  "text": "自分のキャラの見た目の希望を伝える",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m3",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "trpgvid",
+          "text": "まとめて動画化を依頼する",
+          "arrow": "sync",
+          "linkTargetId": "L2-multispeaker-claude"
+        },
+        {
+          "id": "m4",
+          "kind": "message",
+          "fromId": "trpgvid",
+          "toId": "user",
+          "text": "たたき台を提示",
+          "arrow": "reply"
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "opt",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "メンバーにも確認してもらう",
+              "items": [
+                {
+                  "id": "m5",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "members",
+                  "text": "一旦見せて意見をもらう",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m6",
+                  "kind": "message",
+                  "fromId": "members",
+                  "toId": "user",
+                  "text": "修正希望を伝える",
+                  "arrow": "reply"
+                },
+                {
+                  "id": "m7",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "trpgvid",
+                  "text": "反映を依頼",
+                  "arrow": "sync",
+                  "linkTargetId": "L2-edit-rerender-loop"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m8",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "members",
+          "text": "完成版を共有する",
+          "arrow": "sync"
+        }
+      ]
+    },
+    {
+      "id": "L1-repeat-usage-job",
+      "layer": "L1",
+      "title": "継続利用ジョブ: 毎セッション後に使い、だんだん手間が減る",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "trpgvid",
+          "name": "trpgvid",
+          "kind": "system"
+        },
+        {
+          "id": "audience",
+          "name": "卓メンバー/視聴者",
+          "kind": "actor"
+        }
+      ],
+      "items": [
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "loop",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "セッションのたびに (数ヶ月単位で繰り返す)",
+              "items": [
+                {
+                  "id": "m1",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "trpgvid",
+                  "text": "今回のセッション音源を渡す",
+                  "arrow": "sync",
+                  "linkTargetId": "L2-knowledge-learning"
+                },
+                {
+                  "id": "m2",
+                  "kind": "message",
+                  "fromId": "trpgvid",
+                  "toId": "user",
+                  "text": "たたき台を提示 (前回までの学習で誤変換が減っている想定)",
+                  "arrow": "reply",
+                  "note": "『使うほど賢く安くなる』という価値提案そのもの"
+                },
+                {
+                  "id": "b1a1",
+                  "kind": "block",
+                  "blockKind": "opt",
+                  "branches": [
+                    {
+                      "id": "b1a1a",
+                      "label": "気になる箇所があれば",
+                      "items": [
+                        {
+                          "id": "m3",
+                          "kind": "message",
+                          "fromId": "user",
+                          "toId": "trpgvid",
+                          "text": "直す",
+                          "arrow": "sync"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "m4",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "audience",
+                  "text": "共有する",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "L1-abandoned-job",
+      "layer": "L1",
+      "title": "離脱ジョブ: 求める品質・手間に届かず別解に乗り換える",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "trpgvid",
+          "name": "trpgvid",
+          "kind": "system"
+        },
+        {
+          "id": "altsolution",
+          "name": "手作業編集/他の動画編集ソフト",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "trpgvid",
+          "text": "動画にしてほしいと依頼",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "trpgvid",
+          "toId": "user",
+          "text": "たたき台を提示",
+          "arrow": "reply"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "多少妥協して使う",
+              "items": [
+                {
+                  "id": "m3",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "user",
+                  "text": "妥協点を決めて手直しを続ける (L1-baseline-job の手直しループへ合流)",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "許容できない品質・手間と判断し見切りをつける",
+              "items": [
+                {
+                  "id": "b1b1",
+                  "kind": "block",
+                  "blockKind": "break",
+                  "branches": [
+                    {
+                      "id": "b1b1a",
+                      "label": "ジョブを trpgvid から降ろす",
+                      "items": [
+                        {
+                          "id": "m4",
+                          "kind": "message",
+                          "fromId": "user",
+                          "toId": "altsolution",
+                          "text": "手作業または他ツールで作り直す",
+                          "arrow": "sync",
+                          "note": "Christensen の JTBD: ジョブが片付かなければ利用者は別の解を『雇用』する。ここが競合すべき本当の相手"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "L1-budget-constrained-job",
+      "layer": "L1",
+      "title": "制約下ジョブ: 予算内でやりくりする vs 課金判断",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "trpgvid",
+          "name": "trpgvid",
+          "kind": "system"
+        },
+        {
+          "id": "external",
+          "name": "外部AIサービス",
+          "kind": "system"
+        },
+        {
+          "id": "audience",
+          "name": "卓メンバー/視聴者",
+          "kind": "actor"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "trpgvid",
+          "text": "無料機能だけで依頼する",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "できあがりが十分",
+              "items": [
+                {
+                  "id": "m2",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "audience",
+                  "text": "そのまま共有する",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "物足りない",
+              "items": [
+                {
+                  "id": "b1b1",
+                  "kind": "block",
+                  "blockKind": "opt",
+                  "branches": [
+                    {
+                      "id": "b1b1a",
+                      "label": "課金してでも質を上げたい",
+                      "items": [
+                        {
+                          "id": "m3",
+                          "kind": "message",
+                          "fromId": "user",
+                          "toId": "external",
+                          "text": "有料プランに切り替える判断をする",
+                          "arrow": "sync"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "m4",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "trpgvid",
+                  "text": "有料設定で作り直しを依頼",
+                  "arrow": "sync",
+                  "linkTargetId": "L2-multispeaker-claude"
+                },
+                {
+                  "id": "m5",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "audience",
+                  "text": "共有する",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "L2-quick-generate",
+      "layer": "L2",
+      "title": "クイック生成フロー (単一音声・ルールLLM・デフォルト設定)",
+      "parentId": "L1-baseline-job",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "ui",
+          "name": "ブラウザUI",
+          "kind": "process"
+        },
+        {
+          "id": "job",
+          "name": "生成ジョブ (バックグラウンドスレッド)",
+          "kind": "process"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "「📂 ファイルを選ぶ…」で音声ファイルを1つ選択 (tkinter askopenfilenames)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "設定はデフォルトのまま (STT=medium / LLM=rule / layout=anime)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m3",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "「🎬 動画を生成する」をクリック",
+          "arrow": "sync"
+        },
+        {
+          "id": "m4",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "job",
+          "text": "POST /api/run (full=True)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "話者分離が正常に完了",
+              "items": [
+                {
+                  "id": "m5",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "job",
+                  "text": "前処理→文字起こし→台本生成→アセット生成→レンダリング",
+                  "arrow": "sync",
+                  "note": "_set_stage() が渡す実際のステージ名と一致させた表記",
+                  "linkTargetId": "L2-camera-shot-variation"
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "単一トラックの話者分離に失敗",
+              "items": [
+                {
+                  "id": "m6",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "job",
+                  "text": "pyannote 失敗 → 軽量クラスタリング (diarize_lite) にフォールバック",
+                  "arrow": "sync",
+                  "note": "pyannote 未導入 / HF_TOKEN 未設定でも同経路"
+                },
+                {
+                  "id": "m7",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "job",
+                  "text": "それでも失敗 → 単一話者として処理を継続",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "loop",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "完了/エラーになるまで 800ms 間隔",
+              "items": [
+                {
+                  "id": "m8",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "job",
+                  "text": "GET /api/state (ステージ名・%・ログ末尾を取得)",
+                  "arrow": "sync",
+                  "note": "% はログ行を正規表現でスクレイプして算出"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m9",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "ui",
+          "text": "state=\"done\" (video path)",
+          "arrow": "reply"
+        },
+        {
+          "id": "m10",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "user",
+          "text": "生成動画を再生 + 「📤 共有する」「台本を編集する」+ 履歴ギャラリーを表示 (V-3 で「フォルダを開く」から格上げ)",
+          "linkTargetId": "L2-render-history-share",
+          "arrow": "reply"
+        }
+      ]
+    },
+    {
+      "id": "L2-multispeaker-claude",
+      "layer": "L2",
+      "title": "複数話者トラック + Claude添削 + AI立ち絵 フロー",
+      "parentId": "L1-quality-obsessed-job",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "ui",
+          "name": "ブラウザUI",
+          "kind": "process"
+        },
+        {
+          "id": "job",
+          "name": "生成ジョブ",
+          "kind": "process"
+        },
+        {
+          "id": "claude",
+          "name": "Claude API",
+          "kind": "system"
+        },
+        {
+          "id": "artapi",
+          "name": "画像生成API (Gemini/OpenAI)",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "「📂 ファイルを選ぶ…」で話者ごとの音声ファイルを複数選択",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "user",
+          "text": "キャラクター表を自動生成 (表示名/髪/瞳/テーマ/服/立ち位置/見た目) → 表示",
+          "arrow": "reply"
+        },
+        {
+          "id": "m3",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "キャラ表を編集 (表示名・髪・瞳・立ち位置等)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m4",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "LLMプロバイダを claude に切替",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "opt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "APIキー未設定",
+              "items": [
+                {
+                  "id": "m5",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "ui",
+                  "text": "Claudeキーを入力 → POST /api/secrets で保存",
+                  "arrow": "sync",
+                  "note": "config/secrets.json のみに保存。空文字送信でキー削除扱い"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m6",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "画風を gemini/openai に設定し「生成する」",
+          "arrow": "sync"
+        },
+        {
+          "id": "m7",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "job",
+          "text": "POST /api/run (full=True)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "Claude添削 成功",
+              "items": [
+                {
+                  "id": "m8",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "claude",
+                  "text": "台本を洗練 (話し言葉→字幕・感情タグ付与)",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m9",
+                  "kind": "message",
+                  "fromId": "claude",
+                  "toId": "job",
+                  "text": "添削結果",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "b2b",
+              "label": "Claude添削 失敗",
+              "items": [
+                {
+                  "id": "m10",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "claude",
+                  "text": "台本を洗練",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m11",
+                  "kind": "message",
+                  "fromId": "claude",
+                  "toId": "job",
+                  "text": "AuthenticationError / タイムアウト等",
+                  "arrow": "lost",
+                  "note": "認証エラーは明確に区別、それ以外は例外を握りつぶす"
+                },
+                {
+                  "id": "m12",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "job",
+                  "text": "該当チャンクだけ RuleRefiner にフォールバックして処理継続",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b3",
+          "kind": "block",
+          "blockKind": "par",
+          "branches": [
+            {
+              "id": "b3a",
+              "label": "立ち絵生成",
+              "items": [
+                {
+                  "id": "m13",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "artapi",
+                  "text": "キャラクター立ち絵を生成 (assets/ai/<char>/ にキャッシュ)",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "b3b",
+              "label": "演出決定",
+              "items": [
+                {
+                  "id": "m14",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "job",
+                  "text": "背景/カメラワーク/BGM/SE を選定",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m15",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "ui",
+          "text": "完了",
+          "arrow": "reply"
+        },
+        {
+          "id": "m16",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "user",
+          "text": "動画 + 立ち絵付きキャラ表を表示",
+          "arrow": "reply"
+        }
+      ]
+    },
+    {
+      "id": "L2-edit-rerender-loop",
+      "layer": "L2",
+      "title": "台本編集 → 部分再レンダリング ループ",
+      "parentId": "L1-baseline-job",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "ui",
+          "name": "ブラウザUI (タイムライン編集)",
+          "kind": "process"
+        },
+        {
+          "id": "knowledge",
+          "name": "知識DB (SQLite)",
+          "kind": "database"
+        },
+        {
+          "id": "job",
+          "name": "再レンダリングジョブ",
+          "kind": "process"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "「📝 台本を編集する」をクリック",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "ui",
+          "text": "/api/script, /api/audio-options を取得しタイムラインを構築 (シーン行/セリフ行/音声行)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "loop",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "編集を続ける間",
+              "items": [
+                {
+                  "id": "m3",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "ui",
+                  "text": "ブロックをクリック → インスペクタでセリフ/シーン項目を編集",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "b1a1",
+                  "kind": "block",
+                  "blockKind": "opt",
+                  "branches": [
+                    {
+                      "id": "b1a1a",
+                      "label": "再生位置を確認したい",
+                      "items": [
+                        {
+                          "id": "m4",
+                          "kind": "message",
+                          "fromId": "user",
+                          "toId": "ui",
+                          "text": "タイムラインの空白をクリック (プレイヘッド移動)",
+                          "arrow": "sync"
+                        },
+                        {
+                          "id": "m5",
+                          "kind": "message",
+                          "fromId": "ui",
+                          "toId": "job",
+                          "text": "GET /api/frame?t=... (1コマプレビュー)",
+                          "arrow": "sync"
+                        },
+                        {
+                          "id": "m6",
+                          "kind": "message",
+                          "fromId": "job",
+                          "toId": "ui",
+                          "text": "JPEGプレビュー",
+                          "arrow": "reply"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m7",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "「💾 保存して再レンダリング」をクリック",
+          "arrow": "sync"
+        },
+        {
+          "id": "m8",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "ui",
+          "text": "POST /api/script (Pydantic Script.model_validate)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "break",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "バリデーション失敗",
+              "items": [
+                {
+                  "id": "m9",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "user",
+                  "text": "エラー表示。編集内容は画面上に残るが取り消しはリロードのみ",
+                  "arrow": "lost",
+                  "note": "per-field の取り消し操作なし"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m10",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "knowledge",
+          "text": "旧テキストとの差分から誤変換修正を学習",
+          "arrow": "sync",
+          "note": "harvest_corrections(source=\"user\"): 1回の出現で即採用"
+        },
+        {
+          "id": "m11",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "job",
+          "text": "POST /api/rerender (full=False: アセット生成+レンダリングのみ)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b3",
+          "kind": "block",
+          "blockKind": "loop",
+          "branches": [
+            {
+              "id": "b3a",
+              "label": "完了まで 800ms 間隔でポーリング",
+              "items": [
+                {
+                  "id": "m12",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "job",
+                  "text": "GET /api/state",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m13",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "ui",
+          "text": "完了",
+          "arrow": "reply"
+        },
+        {
+          "id": "m14",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "user",
+          "text": "更新された動画を表示",
+          "arrow": "reply"
+        }
+      ]
+    },
+    {
+      "id": "L2-job-conflict-cancel",
+      "layer": "L2",
+      "title": "ジョブ競合・キャンセル フロー",
+      "parentId": "L1-baseline-job",
+      "participants": [
+        {
+          "id": "userA",
+          "name": "利用者A",
+          "kind": "actor"
+        },
+        {
+          "id": "userB",
+          "name": "利用者B (別タブ)",
+          "kind": "actor"
+        },
+        {
+          "id": "ui",
+          "name": "ブラウザUI",
+          "kind": "process"
+        },
+        {
+          "id": "job",
+          "name": "生成ジョブ (単一ロック)",
+          "kind": "process"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "userA",
+          "toId": "ui",
+          "text": "「動画を生成する」をクリック",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "job",
+          "text": "POST /api/run → ジョブ開始",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "別タブ/別利用者が実行中に生成を押す",
+              "items": [
+                {
+                  "id": "m3",
+                  "kind": "message",
+                  "fromId": "userB",
+                  "toId": "ui",
+                  "text": "「動画を生成する」を同時に押す",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m4",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "userB",
+                  "text": "409 \"既にジョブが実行中です\"",
+                  "arrow": "lost",
+                  "note": "汎用エラー文言のみ。実行中UIとの視覚的な連動は弱い"
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "ファイル選択ダイアログを連打",
+              "items": [
+                {
+                  "id": "m5",
+                  "kind": "message",
+                  "fromId": "userA",
+                  "toId": "ui",
+                  "text": "「📂 ファイルを選ぶ…」を連打",
+                  "arrow": "sync",
+                  "note": "DIALOG_LOCK で直列化。片方のtkinterダイアログが閉じるまでもう片方は無反応に見える"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m6",
+          "kind": "message",
+          "fromId": "userA",
+          "toId": "ui",
+          "text": "「⏹ キャンセル」を押す",
+          "arrow": "sync"
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "critical",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "STT/レンダリングのループ内でチェック中 (必ず検知)",
+              "items": [
+                {
+                  "id": "m7",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "job",
+                  "text": "abort_check() がループ内で検知",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m8",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "ui",
+                  "text": "progress.JobCancelled 例外で中断 → state=\"cancelled\", stage=\"キャンセルしました\"",
+                  "arrow": "lost"
+                }
+              ]
+            },
+            {
+              "id": "b2b",
+              "label": "前処理/台本生成の最中 (チェックポイントなし)",
+              "items": [
+                {
+                  "id": "m9",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "job",
+                  "text": "abort_check() が呼ばれず反応しない",
+                  "arrow": "sync",
+                  "note": "この間キャンセルボタンは見た目上のみ機能する"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m10",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "userA",
+          "text": "state=\"cancelled\" として「キャンセルしました」を表示",
+          "arrow": "reply"
+        }
+      ]
+    },
+    {
+      "id": "L2-cli-staged",
+      "layer": "L2",
+      "title": "CLI 段階実行フロー (非UI・玄人向け)",
+      "parentId": "L1-baseline-job",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "cli",
+          "name": "trpgvid CLI",
+          "kind": "process"
+        },
+        {
+          "id": "workdir",
+          "name": "work/ 中間ファイル",
+          "kind": "database"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "cli",
+          "text": "trpgvid transcribe a.wav b.wav",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "cli",
+          "toId": "workdir",
+          "text": "文字起こし結果を保存",
+          "arrow": "sync"
+        },
+        {
+          "id": "m3",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "cli",
+          "text": "trpgvid script",
+          "arrow": "sync"
+        },
+        {
+          "id": "m4",
+          "kind": "message",
+          "fromId": "cli",
+          "toId": "workdir",
+          "text": "script.json を保存",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "opt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "台本を手で調整したい",
+              "items": [
+                {
+                  "id": "m5",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "workdir",
+                  "text": "script.json を直接編集 (グロッサリー・タイミング修正等)",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m6",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "cli",
+          "text": "trpgvid assets",
+          "arrow": "sync"
+        },
+        {
+          "id": "m7",
+          "kind": "message",
+          "fromId": "cli",
+          "toId": "workdir",
+          "text": "立ち絵/背景/音声素材を生成して保存",
+          "arrow": "sync"
+        },
+        {
+          "id": "m8",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "cli",
+          "text": "trpgvid render",
+          "arrow": "sync"
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "正常終了",
+              "items": [
+                {
+                  "id": "m9",
+                  "kind": "message",
+                  "fromId": "cli",
+                  "toId": "workdir",
+                  "text": "output.mp4 を出力",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m10",
+                  "kind": "message",
+                  "fromId": "cli",
+                  "toId": "user",
+                  "text": "出力パスを表示",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "b2b",
+              "label": "ファイル未検出/実行時エラー",
+              "items": [
+                {
+                  "id": "m11",
+                  "kind": "message",
+                  "fromId": "cli",
+                  "toId": "user",
+                  "text": "\"エラー: {e}\" を表示し終了コード1",
+                  "arrow": "lost"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "L2-knowledge-learning",
+      "layer": "L2",
+      "title": "学習ループ (使うほど賢く・安くなる)",
+      "parentId": "L1-repeat-usage-job",
+      "ticketId": "t-glossary-wiring",
+      "note": "[調査結果 2026-08-25] 配線は閉じていた。trpgvid/pipeline/transcribe.py::run() が knowledge.learned_glossary() を呼び、cfg.stt.glossary(手動指定・優先)とマージして _apply_glossary() でセグメントに適用している。書き込み側も trpgvid/ui/server.py(source=\"user\")・trpgvid/llm/claude.py(source=\"llm\")の両方が knowledge.harvest_corrections() を呼んでおり揃っている。dummy STTエンジンで実際にパイプラインを流し、学習した修正が transcript.json まで届くことを tests/test_transcribe.py で確認した(以前は「実装箇所を特定できず要検証」だったが解消)。",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "ui",
+          "name": "ブラウザUI",
+          "kind": "process"
+        },
+        {
+          "id": "knowledge",
+          "name": "知識DB (SQLite)",
+          "kind": "database"
+        },
+        {
+          "id": "llm",
+          "name": "LLM (Claude/Ollama)",
+          "kind": "system"
+        },
+        {
+          "id": "stt",
+          "name": "STTエンジン",
+          "kind": "process"
+        }
+      ],
+      "items": [
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "loop",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "複数回のセッションにわたって",
+              "items": [
+                {
+                  "id": "m1",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "ui",
+                  "text": "台本編集で誤変換を修正して保存",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m2",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "knowledge",
+                  "text": "harvest_corrections(source=\"user\")",
+                  "arrow": "sync",
+                  "note": "1回の出現で即採用。LLM由来より10倍の重み"
+                },
+                {
+                  "id": "m3",
+                  "kind": "message",
+                  "fromId": "llm",
+                  "toId": "knowledge",
+                  "text": "台本添削中に見つけた誤変換候補を記録 (source=\"llm\")",
+                  "arrow": "async",
+                  "note": "3回出現するまでは仮候補"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "userソースが1回以上",
+              "items": [
+                {
+                  "id": "m4",
+                  "kind": "message",
+                  "fromId": "knowledge",
+                  "toId": "knowledge",
+                  "text": "learned_glossary に採用",
+                  "arrow": "sync"
+                }
+              ]
+            },
+            {
+              "id": "b2b",
+              "label": "llmソースが3回未満",
+              "items": [
+                {
+                  "id": "m5",
+                  "kind": "message",
+                  "fromId": "knowledge",
+                  "toId": "knowledge",
+                  "text": "保留のまま",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m6",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "次回セッションの音声を投入して生成",
+          "arrow": "sync"
+        },
+        {
+          "id": "b3",
+          "kind": "block",
+          "blockKind": "opt",
+          "branches": [
+            {
+              "id": "b3a",
+              "label": "学習済み用語がSTTに反映される (確認済み)",
+              "items": [
+                {
+                  "id": "m7",
+                  "kind": "message",
+                  "fromId": "knowledge",
+                  "toId": "stt",
+                  "text": "learned_glossary() を transcribe.run() が取得し cfg.stt.glossary とマージして提供",
+                  "arrow": "sync",
+                  "note": "tests/test_transcribe.py::TestLearnedGlossaryWiredIntoTranscribeRun で dummy STT を実走させ transcript.json までの反映を確認済み"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m8",
+          "kind": "message",
+          "fromId": "stt",
+          "toId": "ui",
+          "text": "誤変換が減った文字起こし結果",
+          "arrow": "reply"
+        },
+        {
+          "id": "m9",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "user",
+          "text": "生成結果の下に「📚 学習辞書 N語」を表示 (loadStats() が /api/stats を取得)",
+          "arrow": "reply",
+          "note": "trpgvid/ui/static/index.html の showResult()→loadStats() で実装済み。ここが m1/m6 の操作に対する『使うほど賢くなっている』実感の返し先"
+        }
+      ]
+    },
+    {
+      "id": "L2-camera-shot-variation",
+      "layer": "L2",
+      "title": "アニメ風カメラワーク: 画角・向き(正面/側面/背面)のバリエーション決定",
+      "parentId": "L1-baseline-job",
+      "ticketId": "t-camera-shot",
+      "note": "現状は shot=group/insert/overhead/background/closeup の切り替えと facing(-1..1 の3/4視点の首振り)のみ。「後ろ向き」「真横」といった向きの差分立ち絵が無いため、演出は常にほぼ正面顔。ここでは無料枠(ルールベース)を既定にし、Ollama等ローカルLLMは任意の演出強化としてのみ使う。\n\n[as-built] 「真横」は見送り、「背面(back)」のみ実装した(スコープを絞って早く動くものを出す判断)。ScriptLine.facing: Literal[\"front\",\"back\"] を追加。facing=\"back\" は group のままだと画面に向きが伝わらないため shot を自動で closeup に昇格させる(item検出がshot=insertへ昇格するのと同じ既存パターンを踏襲)。そのため back の描画対象は closeup のみで、group/background 等の複数人フレームには反映されない(将来 group 内の個別キャラ向き替えをやるなら別チケット)。背面立ち絵は表情差分を作らず1枚のシルエットのみ生成(表情が見えないので差分を作る意味がないため)。実際の合成結果は front/back を並べたスクリーンショットで確認済み(名前欄・字幕は維持され、顔だけ後頭部シルエットに置き換わる)。",
+      "participants": [
+        {
+          "id": "job",
+          "name": "生成ジョブ (assets/render パイプライン)",
+          "kind": "process"
+        },
+        {
+          "id": "script",
+          "name": "台本 (Script/ScriptLine)",
+          "kind": "database"
+        },
+        {
+          "id": "director",
+          "name": "演出ルール (rule-based, layouts.py/render.py)",
+          "kind": "process"
+        },
+        {
+          "id": "llm",
+          "name": "ローカルLLM (Ollama, 任意)",
+          "kind": "system"
+        },
+        {
+          "id": "artgen",
+          "name": "立ち絵ジェネレータ (character.py)",
+          "kind": "process"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "script",
+          "text": "シーン内の各セリフの shot タグ・感情タグ・地の文(ト書き)を取得",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "通常の会話 (既定)",
+              "items": [
+                {
+                  "id": "m2",
+                  "kind": "message",
+                  "fromId": "director",
+                  "toId": "job",
+                  "text": "shot(group/closeup/insert等)は既存ロジックのまま。facing は立ち位置(左右)から3/4視点で決定 (無料・追加コスト無し)",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "場面転換・独白・決意・回想などの演出強調",
+              "items": [
+                {
+                  "id": "b1b1",
+                  "kind": "block",
+                  "blockKind": "opt",
+                  "branches": [
+                    {
+                      "id": "b1b1a",
+                      "label": "Ollamaが起動している場合のみ",
+                      "items": [
+                        {
+                          "id": "m3",
+                          "kind": "message",
+                          "fromId": "director",
+                          "toId": "llm",
+                          "text": "セリフ・ト書きの短い抜粋を渡し、shot候補(背面/横顔/俯瞰/寄り)とfacingを1語で提案させる",
+                          "arrow": "sync",
+                          "note": "ローカル実行のため追加課金無し。プロンプトは短く・出力は列挙型のみに制約してコストと誤爆を抑える"
+                        },
+                        {
+                          "id": "b1b1a1",
+                          "kind": "block",
+                          "blockKind": "alt",
+                          "branches": [
+                            {
+                              "id": "b1b1a1a",
+                              "label": "妥当な列挙値が返る",
+                              "items": [
+                                {
+                                  "id": "m4",
+                                  "kind": "message",
+                                  "fromId": "llm",
+                                  "toId": "director",
+                                  "text": "shot候補 (例: back/profile/overhead) を返す",
+                                  "arrow": "reply"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "b1b1a1b",
+                              "label": "未起動/タイムアウト/想定外の値",
+                              "items": [
+                                {
+                                  "id": "m5",
+                                  "kind": "message",
+                                  "fromId": "llm",
+                                  "toId": "director",
+                                  "text": "接続エラー or 不正な値",
+                                  "arrow": "lost",
+                                  "note": "例外を握りつぶし、必ずルールベースへフォールバック(既存のClaude失敗時と同じ方針)"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "m6",
+                  "kind": "message",
+                  "fromId": "director",
+                  "toId": "director",
+                  "text": "LLM未使用/失敗時はキーワード辞書(「振り返る」「背中を向け」「一人になり」等)でshot/facingを決定",
+                  "arrow": "sync",
+                  "note": "ルールベースは常に成功する既定経路として必須"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m7",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "artgen",
+          "text": "決定した facing (front/profile-L/profile-R/back) で立ち絵差分をリクエスト",
+          "arrow": "sync"
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "その facing の差分が assets/characters/<id>/ に既に生成済み",
+              "items": [
+                {
+                  "id": "m8",
+                  "kind": "message",
+                  "fromId": "artgen",
+                  "toId": "job",
+                  "text": "キャッシュ済みPNGを返す",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "b2b",
+              "label": "未生成",
+              "items": [
+                {
+                  "id": "m9",
+                  "kind": "message",
+                  "fromId": "artgen",
+                  "toId": "artgen",
+                  "text": "PIL でプロシージャル生成 (facing=-1..1に加え back を新規実装。back時は表情差分を描かず後頭部+服のシルエットのみ)",
+                  "arrow": "sync",
+                  "note": "権利的にクリーンな無料手段を維持。手描きPNGへの差し替え口(同名ファイル)も back_*.png として揃える"
+                },
+                {
+                  "id": "m10",
+                  "kind": "message",
+                  "fromId": "artgen",
+                  "toId": "job",
+                  "text": "生成したPNGを返しキャッシュに保存",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b3",
+          "kind": "block",
+          "blockKind": "opt",
+          "branches": [
+            {
+              "id": "b3a",
+              "label": "facing=back で名前欄・表情が見えない",
+              "items": [
+                {
+                  "id": "m11",
+                  "kind": "message",
+                  "fromId": "job",
+                  "toId": "job",
+                  "text": "字幕(名前+セリフ窓)は通常どおり表示を維持し、表情変化のみ省略する (誰が話しているか分からなくなる事故を防ぐ)",
+                  "arrow": "sync",
+                  "note": "★実装前に決めておくべき分岐。ここを詰めずに実装すると『背面時に話者不明』の不具合になりやすい"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m12",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "job",
+          "text": "_apply_camera() でズーム/パン/揺れを適用し合成",
+          "arrow": "sync"
+        }
+      ]
+    },
+    {
+      "id": "L3-camera-shot-functions",
+      "layer": "L3",
+      "title": "関数レベル: decide_shot() / generate_character_art(facing=back)",
+      "parentId": "L2-camera-shot-variation",
+      "ticketId": "t-camera-shot",
+      "note": "layouts.py に decide_shot()/decide_facing() を新設 (純ロジック・PIL非依存でテスト対象)。character.py の generate_character_art() に facing='back' を追加し、CANVAS上に後頭部+服の輪郭のみを描く back バリアントを増やす。既存の facing:-1..1 (3/4視点) はそのまま維持し、'back' は別枠の列挙値として扱う。\n\n[as-built] decide_shot/decide_facing という新関数は作らず、既存の trpgvid/pipeline/script.py::_assign_shots() に相乗り(_assign_facing()/_detect_facing() を追加)する形にした。既存の _detect_item/_detect_dice と同じ『キーワード辞書→shot反映』の流儀に揃えたほうが一貫性が保てると判断(設計時点の想定と実装場所が変わった箇所)。character.py 側は当初案どおり generate_back_art()/_draw_character_back() を新設。ollama.generate() 直呼びの代わりに新規モジュール trpgvid/camera_hint.py::suggest_facing() を作り、/api/generate に2秒タイムアウトで問い合わせる(既存 llm/ollama.py の /api/chat + structured output とは別経路。用途が『1語だけ』の軽い問い合わせなのでシンプルなAPIを使った)。呼び出しはシーン頭(j==0)または emotion in (sad, angry) の行に限定し、キーワード一致行では呼ばない(pytestでcall回数を確認済み)。assets.py では back.png をAI画像生成プロバイダに通さず常にプロシージャル生成にし、追加API課金が発生しないことを保証した。手描き差し替えは art_dir/back.png を検出する _user_back_art() で対応。",
+      "participants": [
+        {
+          "id": "renderer",
+          "name": "SceneRenderer (render.py)",
+          "kind": "process"
+        },
+        {
+          "id": "layouts",
+          "name": "layouts.decide_shot/decide_facing()",
+          "kind": "process"
+        },
+        {
+          "id": "llm",
+          "name": "ollama.generate() (任意)",
+          "kind": "system"
+        },
+        {
+          "id": "chargen",
+          "name": "character.generate_character_art()",
+          "kind": "process"
+        },
+        {
+          "id": "diskcache",
+          "name": "assets/characters/<id>/*.png",
+          "kind": "database"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "renderer",
+          "toId": "layouts",
+          "text": "decide_shot(line: ScriptLine, prev_shot: str, cfg: StyleConfig) を呼ぶ",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "layouts",
+          "toId": "layouts",
+          "text": "line.direction (ト書き) を KEYWORD_SHOTS 辞書と照合 (例: 「振り返る」→back, 「見つめ合う」→profile)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "opt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "cfg.llm_shot_hint=True かつキーワード未一致",
+              "items": [
+                {
+                  "id": "m3",
+                  "kind": "message",
+                  "fromId": "layouts",
+                  "toId": "llm",
+                  "text": "generate(model=cfg.ollama_model, format=\"json\", schema={shot, facing}, prompt=短い抜粋)",
+                  "arrow": "sync",
+                  "note": "タイムアウトは1〜2秒程度に短く設定し、体感速度を落とさない"
+                },
+                {
+                  "id": "b1a1",
+                  "kind": "block",
+                  "blockKind": "alt",
+                  "branches": [
+                    {
+                      "id": "b1a1a",
+                      "label": "接続成功 かつ schema通り",
+                      "items": [
+                        {
+                          "id": "m4",
+                          "kind": "message",
+                          "fromId": "llm",
+                          "toId": "layouts",
+                          "text": "{shot, facing} を返す",
+                          "arrow": "reply"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "b1a1b",
+                      "label": "ConnectionError/Timeout/JSONDecodeError",
+                      "items": [
+                        {
+                          "id": "m5",
+                          "kind": "message",
+                          "fromId": "llm",
+                          "toId": "layouts",
+                          "text": "例外",
+                          "arrow": "lost",
+                          "note": "except Exception で握りつぶし既定値へ"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m6",
+          "kind": "message",
+          "fromId": "layouts",
+          "toId": "layouts",
+          "text": "未決定なら既定 shot=\"group\", facing=既存の左右3/4視点ロジック",
+          "arrow": "sync"
+        },
+        {
+          "id": "m7",
+          "kind": "message",
+          "fromId": "layouts",
+          "toId": "renderer",
+          "text": "(shot: str, facing: float|\"back\") を返す",
+          "arrow": "reply"
+        },
+        {
+          "id": "m8",
+          "kind": "message",
+          "fromId": "renderer",
+          "toId": "chargen",
+          "text": "generate_character_art(char, facing=facing) を呼ぶ",
+          "arrow": "sync"
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "facing == \"back\"",
+              "items": [
+                {
+                  "id": "m9",
+                  "kind": "message",
+                  "fromId": "chargen",
+                  "toId": "diskcache",
+                  "text": "back_{emotion}_{variant}.png の存在確認",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "b2a1",
+                  "kind": "block",
+                  "blockKind": "alt",
+                  "branches": [
+                    {
+                      "id": "b2a1a",
+                      "label": "手描き差し替え済み (assets/characters/<id>/back_*.png)",
+                      "items": [
+                        {
+                          "id": "m10",
+                          "kind": "message",
+                          "fromId": "diskcache",
+                          "toId": "chargen",
+                          "text": "既存PNGを返す",
+                          "arrow": "reply"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "b2a1b",
+                      "label": "未生成",
+                      "items": [
+                        {
+                          "id": "m11",
+                          "kind": "message",
+                          "fromId": "chargen",
+                          "toId": "chargen",
+                          "text": "_draw_character_back(): 表情差分を描かず、髪色/服装テーマ色のみで後頭部+背中のシルエットを描画",
+                          "arrow": "sync",
+                          "note": "表情が見えない分、口パクや瞬きのアニメも back では停止させる (無駄な差分生成をしない)"
+                        },
+                        {
+                          "id": "m12",
+                          "kind": "message",
+                          "fromId": "chargen",
+                          "toId": "diskcache",
+                          "text": "back_silhouette.png を保存 (以後キャッシュ)",
+                          "arrow": "sync"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "b2b",
+              "label": "facing が -1.0〜1.0 (既存の正面/3-4視点)",
+              "items": [
+                {
+                  "id": "m13",
+                  "kind": "message",
+                  "fromId": "chargen",
+                  "toId": "chargen",
+                  "text": "既存の _draw_character() をそのまま使用 (変更なし)",
+                  "arrow": "sync"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m14",
+          "kind": "message",
+          "fromId": "chargen",
+          "toId": "renderer",
+          "text": "Image を返す",
+          "arrow": "reply"
+        }
+      ]
+    },
+    {
+      "id": "L2-render-history-share",
+      "layer": "L2",
+      "title": "レンダー履歴 → 比較ギャラリー → 共有 (P1)",
+      "parentId": "L1-baseline-job",
+      "ticketId": "t-render-history",
+      "note": "前提調査: ui/server.py は OUTPUT=Path(\"output.mp4\") 固定で、再生成のたびに上書きしている。つまり『過去N回の結果を並べる』は今の構造では不可能で、まず履歴の保持が土台になる。方針: output.mp4 は『最新』として残し(CLI/テスト/既存の /video と後方互換)、完了時に renders/<id>.mp4 + .thumb.png + .json(ラベル・作成日時・設定の要約) を複製して蓄積する。共有は「フォルダを開く」の格上げ: 対象ファイルを選択した状態でエクスプローラを開き、パスをクリップボードへコピーできるようにする(共有プレビューURL等の新規領域には踏み込まない=共同編集ジョブ対象外の決定と整合)。",
+      "participants": [
+        {
+          "id": "user",
+          "name": "利用者",
+          "kind": "actor"
+        },
+        {
+          "id": "ui",
+          "name": "ブラウザUI",
+          "kind": "process"
+        },
+        {
+          "id": "job",
+          "name": "生成ジョブ",
+          "kind": "process"
+        },
+        {
+          "id": "renders",
+          "name": "renders/ (履歴ファイル)",
+          "kind": "database"
+        },
+        {
+          "id": "os",
+          "name": "OS (エクスプローラ/クリップボード)",
+          "kind": "system"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "user",
+          "toId": "ui",
+          "text": "「🎬 動画を生成する」/「💾 保存して再レンダリング」",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "job",
+          "text": "POST /api/run または /api/rerender",
+          "arrow": "sync"
+        },
+        {
+          "id": "m3",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "job",
+          "text": "render.run() → output.mp4 (最新) を書く",
+          "arrow": "sync"
+        },
+        {
+          "id": "m4",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "renders",
+          "text": "history.record(): renders/<id>.mp4 / .thumb.png / .json に複製 (ラベル既定=「#N レイアウト/LLM/画風」)",
+          "arrow": "sync",
+          "note": "複製に失敗しても生成自体は成功扱いにする(履歴は付加価値であり本流を止めない)"
+        },
+        {
+          "id": "m5",
+          "kind": "message",
+          "fromId": "job",
+          "toId": "ui",
+          "text": "state=done",
+          "arrow": "reply"
+        },
+        {
+          "id": "m6",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "renders",
+          "text": "GET /api/renders (新しい順の一覧)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m7",
+          "kind": "message",
+          "fromId": "ui",
+          "toId": "user",
+          "text": "完成カードに最新を再生 + ギャラリー(サムネイル一覧)を表示",
+          "arrow": "reply"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "見比べたい (こだわりジョブ)",
+              "items": [
+                {
+                  "id": "m8",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "ui",
+                  "text": "ギャラリーで2件を選んで「比較」",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m9",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "user",
+                  "text": "2画面を横並びで表示 (GET /video?id=A, /video?id=B)。それぞれ独立に再生可能",
+                  "arrow": "reply"
+                },
+                {
+                  "id": "b1a1",
+                  "kind": "block",
+                  "blockKind": "opt",
+                  "branches": [
+                    {
+                      "id": "b1a1a",
+                      "label": "名前を付けて区別したい",
+                      "items": [
+                        {
+                          "id": "m10",
+                          "kind": "message",
+                          "fromId": "user",
+                          "toId": "ui",
+                          "text": "ラベルを編集",
+                          "arrow": "sync"
+                        },
+                        {
+                          "id": "m11",
+                          "kind": "message",
+                          "fromId": "ui",
+                          "toId": "renders",
+                          "text": "POST /api/renders/rename → <id>.json を更新",
+                          "arrow": "sync"
+                        },
+                        {
+                          "id": "m12",
+                          "kind": "message",
+                          "fromId": "ui",
+                          "toId": "user",
+                          "text": "一覧のラベルが更新される",
+                          "arrow": "reply"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "この版で共有する (標準ジョブのゴール)",
+              "items": [
+                {
+                  "id": "m13",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "ui",
+                  "text": "「📤 共有する」(最新 or ギャラリーで選んだ版)",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m14",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "os",
+                  "text": "POST /api/share {id} → explorer /select でファイルを選択表示",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m15",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "user",
+                  "text": "共有パネル: ファイルパス表示 + 「パスをコピー」(navigator.clipboard) + サイズ/尺",
+                  "arrow": "reply",
+                  "note": "共有先(Discord等)への投稿はアプリ外。ここは『すぐ貼れる状態にする』までを責務にする"
+                }
+              ]
+            },
+            {
+              "id": "b1c",
+              "label": "要らない版を消す",
+              "items": [
+                {
+                  "id": "m16",
+                  "kind": "message",
+                  "fromId": "user",
+                  "toId": "ui",
+                  "text": "ギャラリーの「削除」",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m17",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "user",
+                  "text": "確認ダイアログ (confirm)。破壊的操作のため必ず確認",
+                  "arrow": "reply"
+                },
+                {
+                  "id": "m18",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "renders",
+                  "text": "POST /api/renders/delete → mp4/thumb/json を削除 (output.mp4 は触らない)",
+                  "arrow": "sync"
+                },
+                {
+                  "id": "m19",
+                  "kind": "message",
+                  "fromId": "ui",
+                  "toId": "user",
+                  "text": "一覧から消える",
+                  "arrow": "reply"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "L3-render-history-functions",
+      "layer": "L3",
+      "title": "関数レベル: history.record/list/rename/delete と UI ルート",
+      "parentId": "L2-render-history-share",
+      "ticketId": "t-render-history",
+      "note": "新モジュール trpgvid/history.py (純ロジック: ファイル操作のみ・Qt/PIL非依存でテスト対象)。ID は作成時刻 YYYYmmdd-HHMMSS(衝突時は -2 等の連番)。ファイル名の安全性のため id は英数字とハイフンのみ許可し、/video?id= 等ではパス結合前に検証する(パストラバーサル防止)。",
+      "participants": [
+        {
+          "id": "server",
+          "name": "ui/server.py (Handler/_run_pipeline)",
+          "kind": "process"
+        },
+        {
+          "id": "history",
+          "name": "history.py",
+          "kind": "process"
+        },
+        {
+          "id": "fs",
+          "name": "renders/ ディレクトリ",
+          "kind": "database"
+        }
+      ],
+      "items": [
+        {
+          "id": "m1",
+          "kind": "message",
+          "fromId": "server",
+          "toId": "history",
+          "text": "_run_pipeline 末尾: record(OUTPUT, cfg)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m2",
+          "kind": "message",
+          "fromId": "history",
+          "toId": "fs",
+          "text": "shutil.copy2(output.mp4 → renders/<id>.mp4)、thumb があれば同様、<id>.json に {id,label,created,layout,llm,art,size} を書く",
+          "arrow": "sync"
+        },
+        {
+          "id": "b1",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b1a",
+              "label": "成功",
+              "items": [
+                {
+                  "id": "m3",
+                  "kind": "message",
+                  "fromId": "history",
+                  "toId": "server",
+                  "text": "エントリ dict を返す → JOB[\"render_id\"] に保持",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "b1b",
+              "label": "OSError (ディスク満杯/権限)",
+              "items": [
+                {
+                  "id": "m4",
+                  "kind": "message",
+                  "fromId": "history",
+                  "toId": "server",
+                  "text": "logger.warning のみ・None を返す (ジョブは done のまま)",
+                  "arrow": "lost"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m5",
+          "kind": "message",
+          "fromId": "server",
+          "toId": "history",
+          "text": "GET /api/renders → list_renders(): *.json を読み created 降順",
+          "arrow": "sync"
+        },
+        {
+          "id": "m6",
+          "kind": "message",
+          "fromId": "history",
+          "toId": "server",
+          "text": "list[dict] (壊れた json は読み飛ばして警告)",
+          "arrow": "reply"
+        },
+        {
+          "id": "m7",
+          "kind": "message",
+          "fromId": "server",
+          "toId": "history",
+          "text": "GET /video?id=X / /thumb?id=X → video_path(id) / thumb_path(id) (id 検証つき)",
+          "arrow": "sync"
+        },
+        {
+          "id": "b2",
+          "kind": "block",
+          "blockKind": "alt",
+          "branches": [
+            {
+              "id": "b2a",
+              "label": "id が ^[A-Za-z0-9-]+$ に一致し存在する",
+              "items": [
+                {
+                  "id": "m8",
+                  "kind": "message",
+                  "fromId": "history",
+                  "toId": "server",
+                  "text": "Path を返す → _serve_video (Range対応の既存関数を再利用)",
+                  "arrow": "reply"
+                }
+              ]
+            },
+            {
+              "id": "b2b",
+              "label": "不正な id / 存在しない",
+              "items": [
+                {
+                  "id": "m9",
+                  "kind": "message",
+                  "fromId": "history",
+                  "toId": "server",
+                  "text": "None → 404",
+                  "arrow": "lost"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m10",
+          "kind": "message",
+          "fromId": "server",
+          "toId": "history",
+          "text": "POST /api/renders/rename {id,label} → rename(id,label): json の label のみ更新 (ファイル名は変えない)",
+          "arrow": "sync"
+        },
+        {
+          "id": "m11",
+          "kind": "message",
+          "fromId": "server",
+          "toId": "history",
+          "text": "POST /api/renders/delete {id} → delete(id): mp4/thumb/json を missing_ok で削除",
+          "arrow": "sync"
+        },
+        {
+          "id": "m12",
+          "kind": "message",
+          "fromId": "history",
+          "toId": "server",
+          "text": "ok/false (存在しない id は false)",
+          "arrow": "reply"
+        }
+      ]
+    }
+  ],
+  "snapshots": [],
+  "testItems": [
+    {
+      "id": "ti-history-record",
+      "diagramId": "L3-render-history-functions",
+      "ticketId": "t-render-history",
+      "category": "normal",
+      "title": "生成完了時に renders/<id>.mp4/.thumb.png/.json が複製され、同一秒でも id が衝突しない",
+      "condition": "output.mp4 と .thumb.png がある状態で history.record() を2回同じ時刻で呼ぶ",
+      "expected": "3ファイルが作られ、既定ラベル「#N layout / llm / art」が付き、2件目は別 id になる",
+      "result": "pass",
+      "resultNote": "tests/test_history.py::TestRecord",
+      "draft": false
+    },
+    {
+      "id": "ti-history-copy-fail",
+      "diagramId": "L3-render-history-functions",
+      "ticketId": "t-render-history",
+      "category": "exception",
+      "title": "複製が OSError で失敗しても例外を上げず None を返す(生成本流を止めない)",
+      "condition": "shutil.copy2 が OSError を投げる",
+      "expected": "record() が None を返し、呼び出し側のジョブは done のまま",
+      "result": "pass",
+      "resultNote": "tests/test_history.py::TestRecord::test_copy_failure_does_not_raise",
+      "draft": false
+    },
+    {
+      "id": "ti-history-traversal",
+      "diagramId": "L3-render-history-functions",
+      "ticketId": "t-render-history",
+      "category": "error",
+      "title": "/video?id= と /thumb?id= に不正な id(../ 等)を渡すと 404 になる",
+      "condition": "id=../output, ..%2F..%2Foutput, a%2Fb, 存在しない id",
+      "expected": "すべて 404。正規の id と id 省略(最新)は 200",
+      "result": "pass",
+      "resultNote": "tests/test_ui_history.py::TestRenderRoutes (Range リクエスト 206 も確認)",
+      "draft": false
+    },
+    {
+      "id": "ti-share-rename-delete",
+      "diagramId": "L2-render-history-share",
+      "ticketId": "t-render-history",
+      "category": "normal",
+      "title": "共有はパスとサイズを返し、rename は一覧に反映、delete は履歴のみ消し output.mp4 を残す",
+      "condition": "実 HTTP サーバに /api/share, /api/renders/rename, /api/renders/delete を POST",
+      "expected": "share: 選んだ版のパス(id 省略で output.mp4)。rename 後の一覧ラベル更新。delete 後も output.mp4 が存在し二度目は 404",
+      "result": "pass",
+      "resultNote": "tests/test_ui_history.py::TestShareRenameDelete",
+      "draft": false
+    },
+    {
+      "id": "ti-ui-visual-gallery",
+      "diagramId": "L2-render-history-share",
+      "ticketId": "t-render-history",
+      "category": "normal",
+      "title": "完成カード・共有パネル・ギャラリー(サムネイル2件)・比較ボタンが実際に画面に出る",
+      "condition": "パイプラインを2回(anime/yukkuri)走らせ履歴を作り、UI を Edge headless で撮影",
+      "expected": "完成カードが表示され、共有パネルにパス+コピー/表示ボタン、ギャラリーに2件のサムネイルとラベル・日時・サイズが並ぶ",
+      "result": "pass",
+      "resultNote": "手動スクリーンショットで確認。この確認で CSS display:none vs JS style.display=\"\" の既存不具合を発見し修正した",
+      "draft": false
+    },
+    {
+      "id": "ti-glossary-wired-e2e",
+      "diagramId": "L2-knowledge-learning",
+      "ticketId": "t-glossary-wiring",
+      "category": "normal",
+      "title": "学習した誤変換が dummy STT パイプラインを通して transcript.json まで反映される",
+      "condition": "knowledge.harvest_corrections で「（セリフ 1）」→「「おはよう」」を学習させた状態で transcribe.run() を実行",
+      "expected": "transcript.segments[0].text が学習後の表記になり、保存された transcript.json にも反映されている",
+      "result": "pass",
+      "resultNote": "tests/test_transcribe.py::TestLearnedGlossaryWiredIntoTranscribeRun::test_end_to_end_correction_reaches_transcript",
+      "draft": false
+    },
+    {
+      "id": "ti-glossary-manual-priority",
+      "diagramId": "L2-knowledge-learning",
+      "ticketId": "t-glossary-wiring",
+      "category": "normal",
+      "title": "手動指定(cfg.stt.glossary)が学習辞書より優先される (run()のマージ順の担保)",
+      "condition": "同じ「誤」語に対して学習辞書と手動指定glossaryの両方に値がある",
+      "expected": "手動指定側の表記が採用される",
+      "result": "pass",
+      "resultNote": "tests/test_transcribe.py::TestApplyGlossaryUnit::test_manual_glossary_overrides_learned",
+      "draft": false
+    },
+    {
+      "id": "ti-glossary-no-learned-noop",
+      "diagramId": "L2-knowledge-learning",
+      "ticketId": "t-glossary-wiring",
+      "category": "boundary",
+      "title": "学習済み語が無い場合はSTT出力を書き換えない",
+      "condition": "corrections テーブルが空の状態で transcribe.run() を実行",
+      "expected": "プレースホルダテキストがそのまま transcript に残る",
+      "result": "pass",
+      "resultNote": "tests/test_transcribe.py::TestLearnedGlossaryWiredIntoTranscribeRun::test_no_learned_entries_leaves_text_untouched",
+      "draft": false
+    },
+    {
+      "id": "ti-facing-keyword",
+      "diagramId": "L3-camera-shot-functions",
+      "ticketId": "t-camera-shot",
+      "category": "normal",
+      "title": "「振り返る」等のキーワードで facing=back を検出する",
+      "condition": "_detect_facing(\"彼はゆっくりと振り返った\") 等の呼び出し",
+      "expected": "back を返す。無関係な文では front を返す",
+      "result": "pass",
+      "resultNote": "tests/test_script.py::TestFacing::test_keyword_detection",
+      "draft": false
+    },
+    {
+      "id": "ti-facing-promotes-closeup",
+      "diagramId": "L3-camera-shot-functions",
+      "ticketId": "t-camera-shot",
+      "category": "state",
+      "title": "facing=back の行は shot=group のままだと向きが伝わらないため closeup へ昇格する",
+      "condition": "shot未指定(group)の行で背面キーワードを検出",
+      "expected": "line.facing=='back' かつ line.shot=='closeup' になる",
+      "result": "pass",
+      "resultNote": "tests/test_script.py::TestFacing::test_back_line_promotes_group_to_closeup",
+      "draft": false
+    },
+    {
+      "id": "ti-facing-disabled",
+      "diagramId": "L3-camera-shot-functions",
+      "ticketId": "t-camera-shot",
+      "category": "boundary",
+      "title": "cfg.style.back_shots=False なら背面検出そのものを行わない",
+      "condition": "back_shots を無効化した設定で背面キーワードの行を処理",
+      "expected": "facing は front のまま (既存動作に影響しない)",
+      "result": "pass",
+      "resultNote": "tests/test_script.py::TestFacing::test_back_shots_disabled_keeps_front",
+      "draft": false
+    },
+    {
+      "id": "ti-llm-hint-scoped",
+      "diagramId": "L3-camera-shot-functions",
+      "ticketId": "t-camera-shot",
+      "category": "normal",
+      "title": "ローカルLLMヒントはキーワード未一致 かつ シーン頭/強い感情の行でのみ呼ばれる",
+      "condition": "camera_llm_hint=True で、キーワード一致行と通常行が混在するシーン",
+      "expected": "キーワードで決まった行では camera_hint.suggest_facing が呼ばれない",
+      "result": "pass",
+      "resultNote": "tests/test_script.py::TestFacing::test_llm_hint_used_only_when_keyword_misses",
+      "draft": false
+    },
+    {
+      "id": "ti-llm-hint-fallback",
+      "diagramId": "L3-camera-shot-functions",
+      "ticketId": "t-camera-shot",
+      "category": "exception",
+      "title": "Ollama未起動/不正応答時は必ず front (ルール既定) にフォールバックする",
+      "condition": "camera_hint.suggest_facing が None を返す(接続エラー相当)",
+      "expected": "例外を出さずに facing='front' のまま処理が続く",
+      "result": "pass",
+      "resultNote": "tests/test_script.py::TestFacing::test_llm_hint_failure_falls_back_to_front",
+      "draft": false
+    },
+    {
+      "id": "ti-back-art-generation",
+      "diagramId": "L3-camera-shot-functions",
+      "ticketId": "t-camera-shot",
+      "category": "normal",
+      "title": "generate_back_art() が後頭部を塗った1枚のPNGを生成する",
+      "condition": "CharacterConfig を渡して generate_back_art を呼ぶ",
+      "expected": "back.png が生成され、中心ピクセルが透明でない(空洞になっていない)。髪色を変えると出力が変わる",
+      "result": "pass",
+      "resultNote": "tests/test_character_art.py (3件)",
+      "draft": false
+    },
+    {
+      "id": "ti-render-back-closeup-visual",
+      "diagramId": "L2-camera-shot-variation",
+      "ticketId": "t-camera-shot",
+      "category": "normal",
+      "title": "facing=back の closeup フレームが実際に背面シルエットで合成され、名前欄/字幕は維持される",
+      "condition": "shot=closeup, facing=back の ScriptLine で Renderer.render_frame() を実際に呼び、front側の行と見比べる",
+      "expected": "front側は顔、back側は後頭部シルエットが描かれ、どちらも名前欄+セリフ窓は表示されたまま",
+      "result": "pass",
+      "resultNote": "手動スモークスクリプトで front.png / back.png を目視確認 (pytest化はしていない実物確認)",
+      "draft": false
+    }
+  ],
+  "concerns": [
+    {
+      "id": "cn-llm-down",
+      "diagramId": "L2-camera-shot-variation",
+      "participantId": "llm",
+      "title": "相手システムの停止",
+      "category": "availability",
+      "description": "Ollama が未起動/未導入のとき、この流れはどう振る舞うか",
+      "status": "dismissed",
+      "dismissReason": "b1b1a1b で必ずルールベース(director)へフォールバックする設計にしたため、LLM停止は無応答扱いにせず正常系として吸収する。追加のR図は起こさない。",
+      "draft": false
+    },
+    {
+      "id": "cn-llm-badoutput",
+      "diagramId": "L2-camera-shot-variation",
+      "participantId": "llm",
+      "title": "未対応形式の入力",
+      "category": "reliability",
+      "description": "LLMが列挙型以外の値・壊れた出力を返したとき、誤ったshot/facingを採用しないか",
+      "status": "dismissed",
+      "dismissReason": "プロンプトを列挙型のみ許容する制約にし、b1b1a1b で想定外の値もルールベースへフォールバックするため誤採用しない。",
+      "draft": false
+    },
+    {
+      "id": "cn-script-notdb",
+      "diagramId": "L2-camera-shot-variation",
+      "participantId": "script",
+      "title": "接続エラー・タイムアウト",
+      "category": "availability",
+      "description": "台本はローカルのPydanticモデル/JSONであり外部DB接続ではないため、接続断は起こらない",
+      "status": "dismissed",
+      "dismissReason": "外部ネットワーク接続を伴わないローカルデータのため対象外。ファイル破損時は既存のPydanticバリデーションでエラー表示される既存経路に乗る。",
+      "draft": false
+    },
+    {
+      "id": "cn-l3-camera-llm",
+      "diagramId": "L3-camera-shot-functions",
+      "participantId": "llm",
+      "title": "相手システムの停止",
+      "category": "availability",
+      "description": "ollama.generate() が未起動/タイムアウト",
+      "status": "dismissed",
+      "dismissReason": "親の L2 (cn-llm-down / cn-llm-badoutput) で検討済み。L3 では b1a1b の except Exception → 既定値 として実装し、tests/test_script.py::TestFacing::test_llm_hint_failure_falls_back_to_front で確認。",
+      "draft": false
+    },
+    {
+      "id": "cn-l3-camera-cache",
+      "diagramId": "L3-camera-shot-functions",
+      "participantId": "diskcache",
+      "title": "接続エラー・タイムアウト",
+      "category": "availability",
+      "description": "assets/characters/<id>/ への PNG 書き込み失敗",
+      "status": "dismissed",
+      "dismissReason": "ローカルファイル書き込みのみ。失敗時は既存の立ち絵生成と同じく assets ステージが例外で失敗し、UI に『エラー』として既存経路で表示される(新しい失敗モードを増やさない)。",
+      "draft": false
+    },
+    {
+      "id": "cn-l3-history-fs",
+      "diagramId": "L3-render-history-functions",
+      "participantId": "fs",
+      "title": "接続エラー・タイムアウト",
+      "category": "availability",
+      "description": "renders/ への書き込み・読み取り失敗",
+      "status": "dismissed",
+      "dismissReason": "親の L2 (cn-renders-disk) で検討済み。書き込み失敗は warning のみで本流を止めず(b1b)、読み取りは壊れた json を読み飛ばす(m6)。",
+      "draft": false
+    },
+    {
+      "id": "cn-renders-disk",
+      "diagramId": "L2-render-history-share",
+      "participantId": "renders",
+      "title": "接続エラー・タイムアウト",
+      "category": "availability",
+      "description": "renders/ への複製がディスク満杯・権限エラーで失敗したとき、生成ジョブまで失敗扱いになるか",
+      "status": "dismissed",
+      "dismissReason": "history.record() は OSError を warning に留めて None を返し、ジョブは done のまま(L3 b1b)。output.mp4 は先に書けているので利用者は最新版を失わない。履歴が増え続ける問題は削除操作(b1c)で利用者が管理する。",
+      "draft": false
+    },
+    {
+      "id": "cn-os-explorer",
+      "diagramId": "L2-render-history-share",
+      "participantId": "os",
+      "title": "相手システムの停止",
+      "category": "availability",
+      "description": "explorer /select が使えない環境(非Windows)や、クリップボードAPIが拒否された場合",
+      "status": "dismissed",
+      "dismissReason": "explorer 起動は subprocess の例外を捕捉して ok:false を返し、UI は共有パネル(パス表示)を必ず出すので、パスを手でコピーする逃げ道が残る。navigator.clipboard 失敗時はパス欄を選択状態にしてフォールバック。",
+      "draft": false
+    },
+    {
+      "id": "cn-user-delete-mistake",
+      "diagramId": "L2-render-history-share",
+      "participantId": "user",
+      "title": "誤操作",
+      "category": "operability",
+      "description": "削除を誤って押した場合に取り消せるか",
+      "status": "dismissed",
+      "dismissReason": "削除前に confirm ダイアログを必ず出す(b1c m17)。Undo は作らないが、最新版は output.mp4 に常に残るため直近の成果物は失われない。",
+      "draft": false
+    },
+    {
+      "id": "cn-render-id-traversal",
+      "diagramId": "L2-render-history-share",
+      "participantId": "renders",
+      "title": "未対応形式の入力",
+      "category": "reliability",
+      "description": "/video?id=../../ のような id でファイルシステムの任意パスを読まれないか",
+      "status": "dismissed",
+      "dismissReason": "id は ^[A-Za-z0-9-]+$ で検証してからパス結合する(L3 b2)。サーバは localhost バインドのみだが多層防御として実装。",
+      "draft": false
+    },
+    {
+      "id": "cn-bj-user",
+      "diagramId": "L1-baseline-job",
+      "participantId": "user",
+      "category": "operability",
+      "title": "たたき台が気に入らず手直しが終わらない",
+      "description": "離脱しないか",
+      "status": "dismissed",
+      "dismissReason": "手直しループを前提にし、見切る場合は L1-abandoned-job で扱う (中間物が残るので他ツールへ渡せる)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-bj-aud",
+      "diagramId": "L1-baseline-job",
+      "participantId": "audience",
+      "category": "operability",
+      "title": "共有先で見られない",
+      "description": "形式の問題",
+      "status": "dismissed",
+      "dismissReason": "出力は output.mp4 (L2-cli-staged)。共有の手段そのものは利用者側の運用で、本ツールの範囲外",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-qj-ext",
+      "diagramId": "L1-quality-obsessed-job",
+      "participantId": "external",
+      "category": "availability",
+      "title": "外部 AI (Claude / 画像生成) が落ちている",
+      "description": "生成が止まるか",
+      "status": "dismissed",
+      "dismissReason": "Claude 添削の失敗はチャンク単位で RuleRefiner にフォールバックして継続 (L2-multispeaker-claude)。画像生成の失敗は cn-ms-art で未検討",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-cj-members",
+      "diagramId": "L1-collaborative-job",
+      "participantId": "members",
+      "category": "operability",
+      "title": "メンバーの音源・返事が揃わない",
+      "description": "揃わないまま作る (足りないパートの扱い) か待つかが図に無い",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-rj-app",
+      "diagramId": "L1-repeat-usage-job",
+      "participantId": "trpgvid",
+      "category": "reliability",
+      "title": "学習が効かず手間が減らない",
+      "description": "継続利用の前提が崩れるか",
+      "status": "dismissed",
+      "dismissReason": "学習済み用語が transcribe に渡ることは確認済み (L2-knowledge-learning)。効き具合は「📚 学習辞書 N 語」で見える",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-aj-user",
+      "diagramId": "L1-abandoned-job",
+      "participantId": "user",
+      "category": "operability",
+      "title": "見切った後に成果が無駄になる",
+      "description": "途中の成果を持ち出せるか",
+      "status": "dismissed",
+      "dismissReason": "CLI 段階実行の work/ に文字起こし・script.json が残り、他ツールで使える",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-bc-ext",
+      "diagramId": "L1-budget-constrained-job",
+      "participantId": "external",
+      "category": "operability",
+      "title": "課金しても品質が出ない時",
+      "description": "無料に戻すか、別の手段へ行くかの判断材料 (前後の比較) が図に無い",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-qg-user",
+      "diagramId": "L2-quick-generate",
+      "participantId": "user",
+      "category": "operability",
+      "title": "生成中に再度押す・途中で閉じる",
+      "description": "二重実行や中断",
+      "status": "dismissed",
+      "dismissReason": "二重実行は 409、中断は ⏹ キャンセル (L2-job-conflict-cancel)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-ms-claude",
+      "diagramId": "L2-multispeaker-claude",
+      "participantId": "claude",
+      "category": "availability",
+      "title": "Claude API に繋がらない",
+      "description": "台本が作れないか",
+      "status": "dismissed",
+      "dismissReason": "該当チャンクだけ RuleRefiner にフォールバックして継続 (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-ms-art",
+      "diagramId": "L2-multispeaker-claude",
+      "participantId": "artapi",
+      "category": "availability",
+      "title": "画像生成 API の失敗・課金切れ",
+      "description": "立ち絵が作れない時に、既定の立ち絵で続けるか止まるかが図に無い",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-er-user",
+      "diagramId": "L2-edit-rerender-loop",
+      "participantId": "user",
+      "category": "operability",
+      "title": "編集を誤って保存する",
+      "description": "戻せるか",
+      "status": "dismissed",
+      "dismissReason": "保存前はサーバに書かず、取り消しはリロード (図に明記した許容)。保存後は再編集で直す",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-er-kb",
+      "diagramId": "L2-edit-rerender-loop",
+      "participantId": "knowledge",
+      "category": "reliability",
+      "title": "知識 DB (SQLite) の書込失敗・破損",
+      "description": "学習の記録に失敗した時に再レンダリングを続けるかが図に無い",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-jc-users",
+      "diagramId": "L2-job-conflict-cancel",
+      "participantId": "userA",
+      "category": "operability",
+      "title": "同時実行と連打",
+      "description": "壊れるか",
+      "status": "dismissed",
+      "dismissReason": "同時は 409、連打はダイアログの多重化を抑える (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-jc-cancel",
+      "diagramId": "L2-job-conflict-cancel",
+      "participantId": "userB",
+      "category": "operability",
+      "title": "前処理・台本生成の最中はキャンセルが効かない",
+      "description": "図に明記された未対応。チェックポイントを足すかどうか未決",
+      "status": "open",
+      "draft": false
+    },
+    {
+      "id": "cn-cli-work",
+      "diagramId": "L2-cli-staged",
+      "participantId": "workdir",
+      "category": "reliability",
+      "title": "中間ファイルが無い・壊れている",
+      "description": "途中から再開できるか",
+      "status": "dismissed",
+      "dismissReason": "ファイル未検出は「エラー」と終了コード 1 で止まり、その段階からやり直す (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-kl-llm",
+      "diagramId": "L2-knowledge-learning",
+      "participantId": "llm",
+      "category": "reliability",
+      "title": "LLM が誤った用語を提案する",
+      "description": "辞書が汚れるか",
+      "status": "dismissed",
+      "dismissReason": "llm ソースは 3 回未満なら保留。採用は利用者の修正 (user ソース) が優先 (図の分岐)",
+      "draft": false,
+      "decidedBy": "Claude",
+      "decidedAt": "2026-10-05T11:30:00+09:00"
+    },
+    {
+      "id": "cn-kl-kb",
+      "diagramId": "L2-knowledge-learning",
+      "participantId": "knowledge",
+      "category": "reliability",
+      "title": "知識 DB の破損・消失",
+      "description": "辞書を失った時に戻す手段 (バックアップ) が図に無い",
+      "status": "open",
+      "draft": false
+    }
+  ],
+  "tickets": [
+    {
+      "id": "t-render-history",
+      "key": "V-3",
+      "title": "P1: レンダー履歴の保持 → 比較ギャラリー → 共有導線の格上げ",
+      "description": "output.mp4 固定上書きの構造を変えず、完了時に renders/ へ複製して履歴化する。UI にサムネイル一覧・2画面比較・ラベル編集・削除を追加し、「フォルダを開く」を「共有する」(explorer選択+パスコピー)へ格上げする。共有プレビューURL等は対象外。\n\n[as-built] trpgvid/history.py(純ロジック・13テスト)、ui/server.py に /api/renders, /video?id=, /thumb?id=, /api/share, /api/renders/rename|delete を追加(実サーバを立てる13テスト)。実物確認(Edge headless)で既存の不具合を発見・修正: CSS の #resultWrap/#progressWrap {display:none} を JS が style.display=\"\" で戻していたため、完成カードと進捗カードが表示されない構造だった → inline style に統一。",
+      "priority": "high",
+      "stages": {
+        "design": "done",
+        "build": "done",
+        "test": "done",
+        "bugfix": "done",
+        "seqsync": "done",
+        "manual": "na"
+      }
+    },
+    {
+      "id": "t-glossary-wiring",
+      "key": "V-2",
+      "title": "学習ループ配線調査 (P0): learned_glossary() は実際に使われているか",
+      "description": "[[trpgvid-scope-decision]] のP0。結論: 配線済み。transcribe.run() が learned_glossary() を呼びcfg.stt.glossaryとマージして適用、ui/server.pyとllm/claude.pyの両方から harvest_corrections() で書き込まれている。dummy STTでのE2E実行により transcript.json までの反映を確認した。あわせてUIの「📚学習辞書N語」表示(既存実装)をL2図に追記し、m1/m6の操作に応答が無いという指摘を解消した。",
+      "priority": "high",
+      "stages": {
+        "design": "done",
+        "build": "na",
+        "test": "done",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "na"
+      }
+    },
+    {
+      "id": "t-camera-shot",
+      "key": "V-1",
+      "title": "アニメ風カメラワーク: 画角・向き(正面/側面/背面)のバリエーション追加",
+      "description": "shot(構図)に加えてキャラの向き(facing: front/profile-L/profile-R/back)を演出として切替可能にする。既定はルールベース(無料)、Ollama等ローカルLLMは演出強調シーンの候補提案のみに限定して使い、失敗時は必ずルールへフォールバックする。",
+      "priority": "normal",
+      "stages": {
+        "design": "done",
+        "build": "done",
+        "test": "done",
+        "bugfix": "na",
+        "seqsync": "done",
+        "manual": "na"
+      }
+    }
+  ]
+}
